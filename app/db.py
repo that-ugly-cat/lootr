@@ -208,6 +208,11 @@ CREATE TABLE IF NOT EXISTS opportunities (
 
     eligible_geographies   TEXT,   -- JSON [{"code":"ITF4","system":"NUTS"}]
     requires_unit_in       TEXT,
+    unit_required_by       TEXT,   -- at_application | at_award | at_first_payment
+                                   -- | by_project_end | unknown. Anything later
+                                   -- than at_application makes the unit a
+                                   -- commitment, not a gate.
+    unit_deadline_months   INTEGER,
     max_company_age_years  INTEGER,
     eligible_sme_sizes     TEXT,   -- JSON
     requires_qualification TEXT,   -- JSON of company_qualifications.key
@@ -255,6 +260,25 @@ CREATE TABLE IF NOT EXISTS opportunity_caps (
     comparator     TEXT,   -- lt | lte
     scope_note     TEXT,   -- verbatim wording: the perimeter is where it bites
     verdict        TEXT,   -- pass | fail | uncertain
+    checked_at     DATETIME
+);
+
+-- What the company would have to take on if funded: open an operating unit in a
+-- region, hire, put up matching money, obtain a certification, incorporate a
+-- newco. Written by the evaluator, so these are judgements, not facts — the
+-- wording they are drawn from stays verbatim in opportunities.other_requirements.
+-- A commitment is not a gate: it never makes the company ineligible, it names a
+-- decision someone has to take. Rebuilt on every evaluation, like the caps.
+CREATE TABLE IF NOT EXISTS opportunity_commitments (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    opportunity_id INTEGER REFERENCES opportunities(id) ON DELETE CASCADE,
+    kind           TEXT,   -- operating_unit | hiring | co_funding | qualification
+                           -- | incorporation | other
+    requirement    TEXT,   -- verbatim wording: what exactly is being asked
+    due_when       TEXT,   -- at_application | at_award | at_first_payment
+                           -- | by_project_end | unknown
+    due_months     INTEGER,
+    cost_note      TEXT,   -- what taking this on would cost the company
     checked_at     DATETIME
 );
 
@@ -399,6 +423,8 @@ CONFIG_DEFAULTS = [
     ("company_display_name", "", "Shown in the UI header"),
     ("scan_model", "claude-opus-5", "Model used by scanner and evaluator"),
     ("default_scan_cadence", "monthly", "Fallback when a source has none"),
+    ("max_scans_per_run", "6", "Sources the nightly scan will touch at most, "
+                               "oldest first. 0 removes the limit"),
 ]
 
 COUNTER_DEFAULTS = [
@@ -427,11 +453,23 @@ OPPORTUNITY_FIELDS = [
     "call_total_budget", "deadline_type", "deadline_date", "deadline_text",
     "cutoff_dates", "recurrence_logic", "opens_at", "decision_lag_months",
     "project_duration_months", "eligible_geographies", "requires_unit_in",
+    "unit_required_by", "unit_deadline_months",
     "max_company_age_years", "eligible_sme_sizes", "requires_qualification",
     "requires_partners", "partner_requirements", "trl_min", "trl_max",
     "sector_tags", "impact_focus", "other_requirements", "ticket_min",
     "ticket_max", "stage_focus", "sector_focus", "geo_focus", "lead_or_follow",
 ]
+
+# When a condition has to hold. `at_application` makes it a gate: fail it and the
+# company may not apply. Anything later makes it a commitment — something to take
+# on if funded, which is a decision rather than an exclusion. One list, imported
+# by the scanner prompt, the evaluator schema and the form widgets, so the three
+# cannot drift apart.
+CONDITION_TIMING = ["at_application", "at_award", "at_first_payment",
+                    "by_project_end", "unknown"]
+
+COMMITMENT_KINDS = ["operating_unit", "hiring", "co_funding", "qualification",
+                    "incorporation", "other"]
 
 
 @contextmanager
@@ -483,6 +521,17 @@ def init_db() -> None:
         ocols = [r["name"] for r in db.execute("PRAGMA table_info(opportunities)")]
         if "is_general" not in ocols:
             db.execute("ALTER TABLE opportunities ADD COLUMN is_general BOOLEAN DEFAULT 0")
+
+        # Migration 2026-08-18: a geographic requirement is not always a gate.
+        # Most Italian schemes accept a company that undertakes to open the unit
+        # within N months of the award, so the record needs the *when*, not only
+        # the *where*. Rows written before this migration keep a null timing,
+        # which reads as "not established" and leaves the verdict uncertain
+        # rather than silently promoting old records to conditional.
+        if "unit_required_by" not in ocols:
+            db.execute("ALTER TABLE opportunities ADD COLUMN unit_required_by TEXT")
+        if "unit_deadline_months" not in ocols:
+            db.execute("ALTER TABLE opportunities ADD COLUMN unit_deadline_months INTEGER")
 
 
 # ------------------------------------------------------------------ helpers

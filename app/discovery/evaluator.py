@@ -15,7 +15,7 @@ import os
 
 import anthropic
 
-from ..db import get_db
+from ..db import COMMITMENT_KINDS, CONDITION_TIMING, get_db
 from .profile_context import opportunity_block, products_block, profile_block
 from .scanner import MODEL
 
@@ -26,6 +26,13 @@ MAX_TURNS = 6
 MAX_FETCHES = 3
 
 VERDICTS = ["eligible", "not_eligible", "uncertain"]
+
+# Eligibility has a fourth value the product fit does not need. `conditional`
+# says the company may apply provided it takes something on — opening a unit,
+# hiring, matching the funding. It is deliberately not folded into `uncertain`:
+# uncertain is ignorance and the fix is research, conditional is a decision and
+# the fix is someone at the company saying yes or no.
+ELIGIBILITY_VERDICTS = VERDICTS + ["conditional"]
 
 
 def _submit_tool(counter_keys: list[str], product_ids: list[int]) -> dict:
@@ -41,7 +48,7 @@ def _submit_tool(counter_keys: list[str], product_ids: list[int]) -> dict:
         "input_schema": {
             "type": "object",
             "properties": {
-                "eligibility_verdict": {"type": "string", "enum": VERDICTS},
+                "eligibility_verdict": {"type": "string", "enum": ELIGIBILITY_VERDICTS},
                 "eligibility_rationale": {
                     "type": "string",
                     "description": "Point by point: which conditions are met, which are "
@@ -72,6 +79,37 @@ def _submit_tool(counter_keys: list[str], product_ids: list[int]) -> dict:
                         "additionalProperties": False,
                     },
                 },
+                "commitments": {
+                    "type": "array",
+                    "description": "What the company would have to take on if funded. "
+                                   "Empty when the opportunity asks for nothing beyond "
+                                   "the project itself.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "kind": {"type": "string", "enum": COMMITMENT_KINDS},
+                            "requirement": {
+                                "type": "string",
+                                "description": "What is being asked, in the source's own "
+                                               "words. Not your paraphrase.",
+                            },
+                            "due_when": {"type": "string", "enum": CONDITION_TIMING},
+                            "due_months": {
+                                "type": "string",
+                                "description": "Months from the trigger in due_when. "
+                                               "Empty string when the call gives none.",
+                            },
+                            "cost_note": {
+                                "type": "string",
+                                "description": "What taking this on would actually cost "
+                                               "this company, given its size and cash.",
+                            },
+                        },
+                        "required": ["kind", "requirement", "due_when", "due_months",
+                                     "cost_note"],
+                        "additionalProperties": False,
+                    },
+                },
                 "product_fit": {
                     "type": "array",
                     "description": "One entry per active product line. Empty when the "
@@ -99,8 +137,8 @@ def _submit_tool(counter_keys: list[str], product_ids: list[int]) -> dict:
                            "enum": ["low", "medium", "high", "needs_consultant"]},
             },
             "required": ["eligibility_verdict", "eligibility_rationale", "caps",
-                         "product_fit", "overall_fit_score", "fit_rationale",
-                         "best_fit_product_id", "effort"],
+                         "commitments", "product_fit", "overall_fit_score",
+                         "fit_rationale", "best_fit_product_id", "effort"],
             "additionalProperties": False,
         },
     }
@@ -112,11 +150,32 @@ company apply, and is it worth the weeks it would take.
 
 ELIGIBILITY. Go through the conditions one at a time against the profile: country and region \
 (only registered locations count — a site marked NOT REGISTERED does not satisfy a requirement \
-for a unit in that region), company age, size, sector, required qualifications, partner \
+for a unit that must already exist), company age, size, sector, required qualifications, partner \
 requirements, TRL. Say which conditions are met, which are not, and which you could not \
 establish. A single failed hard condition makes it not_eligible. If a condition cannot be \
 established from the profile or the call, the verdict is uncertain — never guess your way to \
 eligible.
+
+GATES AND COMMITMENTS. A condition the company does not meet today is not automatically a gate. \
+A **gate** must hold when the application is filed, and failing one makes the opportunity \
+not_eligible. A **commitment** is something the company would take on only if the money is won: \
+opening an operating unit in the region within N months of the award, hiring, putting up matching \
+funds, obtaining a certification, incorporating a new company. Italian regional and national \
+schemes lean heavily on commitments, and reading one as a gate throws away a fundable call in \
+silence, which is the worst mistake available here.
+
+So: the record's unit_required_by says when a required unit must exist. at_application is a gate. \
+at_award, at_first_payment and by_project_end are commitments, and unit_deadline_months is the \
+time allowed. A verdict where every gate passes and at least one commitment is outstanding is \
+**conditional**, never not_eligible. List each commitment: what is asked in the source's own \
+words, when it falls due, and what taking it on would really cost this company — a two-person \
+team opening a registered unit in a region it has no presence in is a real expense, and saying so \
+is the point of the field.
+
+When unit_required_by is empty and the call does not settle it, do not assume either way: the \
+verdict is uncertain and the rationale says what to go and check. Conditional and uncertain are \
+different answers. Uncertain is ignorance, and it is fixed by research; conditional is a decision, \
+and it is fixed by someone at the company saying yes or no.
 
 CAPS. Some opportunities impose a ceiling on what the company has already received: they consume \
 a de minimis allowance, or they are open only to companies that have raised less than some \
@@ -150,6 +209,7 @@ def _write_result(opportunity: dict, result: dict) -> dict:
     field, never status, never the manual priority."""
     oid = opportunity["id"]
     caps = result.get("caps") or []
+    commitments = result.get("commitments") or []
     fits = result.get("product_fit") or []
 
     with get_db() as db:
@@ -162,6 +222,16 @@ def _write_result(opportunity: dict, result: dict) -> dict:
                 (oid, cap.get("counter_key"), cap.get("max_amount"),
                  opportunity.get("currency"), cap.get("comparator"),
                  cap.get("scope_note"), cap.get("verdict")),
+            )
+
+        db.execute("DELETE FROM opportunity_commitments WHERE opportunity_id=?", (oid,))
+        for c in commitments:
+            db.execute(
+                "INSERT INTO opportunity_commitments (opportunity_id, kind, requirement, "
+                "due_when, due_months, cost_note, checked_at) "
+                "VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)",
+                (oid, c.get("kind"), c.get("requirement"), c.get("due_when"),
+                 c.get("due_months") or None, c.get("cost_note")),
             )
 
         db.execute("DELETE FROM opportunity_product_fit WHERE opportunity_id=?", (oid,))
@@ -186,7 +256,8 @@ def _write_result(opportunity: dict, result: dict) -> dict:
     return {"opportunity": opportunity["title"],
             "outcome": result.get("eligibility_verdict"),
             "fit": result.get("overall_fit_score"),
-            "caps": len(caps), "products": len(fits)}
+            "caps": len(caps), "commitments": len(commitments),
+            "products": len(fits)}
 
 
 def evaluate_opportunity(opportunity_id: int) -> dict:

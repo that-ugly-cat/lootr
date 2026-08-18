@@ -107,6 +107,12 @@ Set is_general to "1" when the money is about the company rather than one produc
 a hire, a certification, advice).
 - eligible_geographies: a JSON array, e.g. [{"code":"IT","system":"ISO-3166-1"}] or \
 [{"code":"ITF","system":"NUTS"}]. requires_unit_in: a single code, not a sentence.
+- unit_required_by: exactly one of at_application, at_award, at_first_payment, \
+by_project_end, unknown. This one distinction decides whether a geographic requirement excludes \
+a company or merely costs it something: most Italian schemes do not ask for the operating unit \
+to exist when applying, they ask the applicant to undertake to open it, and unit_deadline_months \
+is how many months it then has. Write unknown when the call does not say, and do not assume \
+either way.
 - eligible_sme_sizes, sector_tags, impact_focus: JSON arrays of short tags, e.g. \
 ["micro","small"]. requires_qualification: a JSON array of qualification keys as they appear in \
 the company profile, e.g. ["it_startup_innovativa"] — not a description of the requirement.
@@ -124,6 +130,11 @@ For kind=new, set opportunity_id to 0 and fill every field you found.
 other_requirements — especially any cap of the form "open only to companies that have raised \
 less than X" or "consumes de minimis". Do not normalise, convert, or interpret them: the exact \
 wording decides whether a cap applies, and a later step judges it against the company's figures.
+- Conditions that fall due only if the money is won — opening a unit in the region, hiring, \
+putting up matching money, obtaining a certification, incorporating a new company — go verbatim \
+into other_requirements together with the deadline attached to them. Never treat one as a reason \
+to skip an opportunity: they are commitments the company would take on, and a later step judges \
+what they would cost.
 - deadline_text is the deadline as the call words it, however long. The structured deadline_date \
 and deadline_type carry the machine-readable version of the same thing.
 - advance_available and disbursement matter: whether the money arrives up front, on milestones, \
@@ -132,7 +143,8 @@ it. Put the conditions attached to an advance in other_requirements, not in the 
 
 Rules on judgement:
 - Skip what the company plainly cannot take: wrong country, wrong sector, a category it does not \
-belong to, a closed scheme with no next edition.
+belong to, a closed scheme with no next edition. A region where the company has no unit is not \
+one of these cases whenever the call lets the unit be opened after the award.
 - Do not skip something merely because eligibility is unclear. Propose it, say what is unclear in \
 the rationale, and set confidence=low.
 - Be conservative: a wrong proposal costs review time. When unsure, say so rather than guessing.
@@ -258,7 +270,36 @@ def due_sources() -> list[dict]:
             ).fetchone()["fresh"]
             if not fresh:
                 due.append(source)
+    # Oldest first, never-scanned before everything else, so a capped run works
+    # its way through the backlog instead of re-reading the same few sources.
+    due.sort(key=lambda s: s["last_scanned_at"] or "")
     return due
+
+
+def apply_scan_cap(sources: list[dict]) -> list[dict]:
+    """Bound what one nightly run costs.
+
+    Every source is a model call with web search behind it, and the day a batch
+    of sources is added they all fall due on the same night: uncapped, the first
+    run would scan the whole list at once and drop a hundred proposals into the
+    queue for review in one go. The rest is not dropped, only postponed — due
+    sources come oldest-first, so the backlog drains over the following nights.
+    The postponement is written to the scan log, because a silent cap reads
+    exactly like a night with nothing to find.
+    """
+    limit = int(get_config("max_scans_per_run", "6") or 0)
+    if not limit or len(sources) <= limit:
+        return sources
+    postponed = [s["name"] for s in sources[limit:]]
+    with get_db() as db:
+        db.execute(
+            "INSERT INTO scan_log (source_id, finished_at, outcome, detail) "
+            "VALUES (NULL, CURRENT_TIMESTAMP, 'ok', ?)",
+            (json.dumps({"outcome": "capped", "limit": limit,
+                         "postponed": postponed}, ensure_ascii=False),),
+        )
+    print(f"[scan] capped at {limit}, postponed: {', '.join(postponed)}")
+    return sources[:limit]
 
 
 def run_scan(source_id: int | None = None, only_due: bool = False) -> list[dict]:
@@ -269,7 +310,7 @@ def run_scan(source_id: int | None = None, only_due: bool = False) -> list[dict]
             row = db.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
         sources = [dict(row)] if row else []
     elif only_due:
-        sources = due_sources()
+        sources = apply_scan_cap(due_sources())
     else:
         with get_db() as db:
             sources = [dict(r) for r in

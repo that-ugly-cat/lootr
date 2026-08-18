@@ -211,6 +211,10 @@ code.key {
 .v-eligible, .v-pass { border-color: #2f855a; color: var(--ok); }
 .v-not_eligible, .v-fail { border-color: var(--danger-border); color: var(--danger); }
 .v-uncertain { border-color: var(--warn); color: var(--warn); }
+/* Conditional is not a weaker uncertain: the company may apply, provided it
+   takes something on. It gets the accent colour rather than the warning one,
+   because what it needs is a decision, not more research. */
+.v-conditional { border-color: var(--accent-dim); color: var(--accent); }
 
 /* counters */
 .counters { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.8rem; }

@@ -37,6 +37,16 @@ of each cap is recorded verbatim from the call, because that wording is where
 these thresholds actually bite; when it is ambiguous the verdict stays
 `uncertain` rather than guessing.
 
+**A gate is not a commitment.** A condition that must hold on the day you apply
+is a gate, and failing one makes the company ineligible. A condition that falls
+due only if the money is won — opening an operating unit in the region, hiring,
+matching funds, a certification, a newco — is a commitment: it never makes the
+company ineligible, it makes the verdict `conditional` and puts a decision in
+front of a human. Italian schemes lean heavily on commitments, so conflating the
+two would discard fundable calls in silence. `unit_required_by` on the record
+carries the *when*, and `opportunity_commitments` carries what the company would
+be signing up for and what it would cost.
+
 **Derived values are never stored.** Company age, team composition gates,
 eligible geographies, company-level TRL and counter cross-checks are computed
 on read, so they cannot go stale when the underlying facts change.
@@ -71,6 +81,7 @@ app/
 scripts/
   seed_beadroots.py  the real profile, from confirmed facts
   seed_demo.py       invented data, for looking at the UI
+  seed_sources.py    the discovery sources, idempotent by name
   smoke_test.py      end-to-end check of everything above
 ```
 
@@ -106,11 +117,15 @@ runs every night and tells the scan where to look first.
 nightly but only touches sources whose own cadence has come round — weekly for
 competitions and accelerator batches, monthly for bodies that publish one call a
 year. It records facts *as written*, thresholds included, and files proposals.
+A run is capped at `max_scans_per_run` sources, oldest first: adding a batch of
+sources makes them all fall due on the same night, and without a ceiling the
+next run would scan the lot and bury the queue. What was postponed goes to the
+scan log rather than passing for a quiet night.
 
 **Evaluator**, the one process that writes outside the queue. What it writes are
 judgements, not facts: eligibility with its reasoning, the caps a call imposes
-with their perimeter quoted verbatim, a fit score per product line, and an
-effort estimate. They are advisory and recomputable; it never touches a factual
+with their perimeter quoted verbatim, the commitments it would ask the company
+to take on, a fit score per product line, and an effort estimate. They are advisory and recomputable; it never touches a factual
 field, a status, or a manual priority. Because a verdict is only meaningful
 relative to the profile it was measured against, a profile edit marks every
 older verdict stale and the UI offers to re-run them.

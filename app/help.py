@@ -295,6 +295,29 @@ HELP: dict[str, tuple[str, str]] = {
         consumes de minimis, or it is open only to companies that have raised
         less than a stated amount. One call can carry several at once.</p>"""),
 
+    "commitments": ("Commitments, not gates", """
+        <p>What the company would have to take on if this money were won:
+        opening an operating unit in the region, hiring, putting up matching
+        funds, obtaining a certification, incorporating a new company.</p>
+        <p>A <em>gate</em> has to hold on the day you apply, and failing one
+        makes the opportunity out of reach. A <em>commitment</em> falls due
+        later, so it never makes you ineligible — it makes the verdict
+        <em>conditional</em> and puts a decision in front of you. Reading a
+        commitment as a gate silently throws away calls you could win, which is
+        why the two are kept apart.</p>
+        <p>Each one carries the requirement in the call's own words, when it
+        falls due, and an estimate of what taking it on would cost.</p>"""),
+
+    "unit_required_by": ("When the unit has to exist", """
+        <p>Most Italian schemes do not require an operating unit in the region
+        on the day you apply: they require an undertaking to open one within a
+        set number of months of the award.</p>
+        <p><em>At application</em> is the only value that makes the requirement
+        a gate. Anything later makes it a commitment, and the months are how
+        long you would have. When a call does not say, this stays empty and the
+        eligibility verdict stays <em>uncertain</em> rather than assuming in
+        either direction.</p>"""),
+
     "scope_note": ("Why the wording is quoted", """
         <p>The trap in these thresholds is not the number, it is the
         definition. "Less than €500k raised" may or may not include public
@@ -356,6 +379,11 @@ HELP: dict[str, tuple[str, str]] = {
     "eligibility": ("Eligibility verdict", """
         <p>Whether the company qualifies at all, judged against the profile, with
         the reasoning spelled out point by point.</p>
+        <p>Four values. <em>Eligible</em> and <em>not eligible</em> speak for
+        themselves. <em>Conditional</em> means you may apply provided you take
+        something on — see the commitments listed below it. <em>Uncertain</em>
+        means a condition could not be established, and the rationale says what
+        to go and check.</p>
         <p>It is re-run when the profile changes, because the day a round closes
         or the company passes an age threshold, half the table means something
         different.</p>"""),

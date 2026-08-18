@@ -13,7 +13,8 @@ from markupsafe import Markup
 from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
                     new_api_key, require_admin, require_editor, require_user,
                     verify_password)
-from ..db import OPPORTUNITY_FIELDS, company_profile, get_db, json_field, status_condition
+from ..db import (CONDITION_TIMING, OPPORTUNITY_FIELDS, company_profile, get_db,
+                  json_field, status_condition)
 from ..discovery.evaluator import evaluate_opportunity, run_evaluations, stale_evaluations
 from ..discovery.link_monitor import run_link_monitor
 from ..discovery.scanner import run_scan
@@ -365,7 +366,8 @@ def opportunity_new(request: Request, view: str = "calls", user=Depends(require_
     return _render(request, "opportunity_form.html", o={}, view=view,
                    action="/opportunities/new", instruments=INSTRUMENTS,
                    provider_types=PROVIDER_TYPES, states=OPPORTUNITY_STATES,
-                   sources=_all_sources(), products=_all_products())
+                   sources=_all_sources(), products=_all_products(),
+                   condition_timing=CONDITION_TIMING)
 
 
 @router.post("/opportunities/new")
@@ -400,6 +402,9 @@ def opportunity_detail(request: Request, opportunity_id: int, user=Depends(requi
             "SELECT c.*, f.label AS counter_label, f.ceiling, f.used_amount "
             "FROM opportunity_caps c LEFT JOIN funding_counters f ON f.key = c.counter_key "
             "WHERE c.opportunity_id=?", (opportunity_id,))]
+        commitments = [dict(r) for r in db.execute(
+            "SELECT * FROM opportunity_commitments WHERE opportunity_id=? ORDER BY id",
+            (opportunity_id,))]
         fits = [dict(r) for r in db.execute(
             "SELECT f.*, p.name AS product_name, p.trl FROM opportunity_product_fit f "
             "LEFT JOIN products p ON p.id = f.product_id WHERE f.opportunity_id=?",
@@ -414,7 +419,8 @@ def opportunity_detail(request: Request, opportunity_id: int, user=Depends(requi
             "SELECT * FROM contacts WHERE opportunity_id=?", (opportunity_id,))]
     return templates.TemplateResponse(
         request, "_opportunity_modal.html",
-        {"o": dict(row), "caps": caps, "fits": fits, "applications": apps,
+        {"o": dict(row), "caps": caps, "commitments": commitments,
+         "fits": fits, "applications": apps,
          "activities": acts, "contacts": contacts, "user": user,
          "today": date.today().isoformat()})
 
@@ -429,7 +435,8 @@ def opportunity_edit(request: Request, opportunity_id: int, view: str = "calls",
     return _render(request, "opportunity_form.html", o=dict(row), view=view,
                    action=f"/opportunities/{opportunity_id}/edit", instruments=INSTRUMENTS,
                    provider_types=PROVIDER_TYPES, states=OPPORTUNITY_STATES,
-                   sources=_all_sources(), products=_all_products())
+                   sources=_all_sources(), products=_all_products(),
+                   condition_timing=CONDITION_TIMING)
 
 
 @router.post("/opportunities/{opportunity_id}/edit")

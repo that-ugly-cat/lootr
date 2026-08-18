@@ -527,6 +527,11 @@ with TestClient(app) as c:
     check("evaluator enumerates only real counters",
           eval_tool["input_schema"]["properties"]["caps"]["items"]["properties"]
           ["counter_key"]["enum"] == ["de_minimis", "lifetime_equity_raised"])
+    check("eligibility offers conditional, product fit does not",
+          "conditional" in eval_tool["input_schema"]["properties"]
+          ["eligibility_verdict"]["enum"]
+          and "conditional" not in eval_tool["input_schema"]["properties"]
+          ["product_fit"]["items"]["properties"]["verdict"]["enum"])
     check("evaluator enumerates only real products",
           eval_tool["input_schema"]["properties"]["product_fit"]["items"]["properties"]
           ["product_id"]["enum"] == [1, 2])
@@ -567,6 +572,7 @@ with TestClient(app) as c:
         "caps": [{"counter_key": "de_minimis", "max_amount": None, "comparator": "lte",
                   "scope_note": "the gross grant equivalent counts against de minimis",
                   "verdict": "pass"}],
+        "commitments": [],
         "product_fit": [
             {"product_id": 1, "verdict": "eligible", "fit_score": 88, "rationale": "TRL fits."},
             {"product_id": 2, "verdict": "not_eligible", "fit_score": 5, "rationale": "Too early."}],
@@ -588,6 +594,61 @@ with TestClient(app) as c:
           and row["effort"] == "high" and row["eligibility_checked_at"])
     check("evaluator leaves status alone", row["status"] == "shortlisted")
     check("evaluator leaves factual fields alone", row["amount_max"] == 1500000)
+
+    # A requirement the company cannot meet today is not automatically a gate:
+    # most Italian schemes let the unit be opened after the award, and reading
+    # that as not_eligible throws away a fundable call in silence.
+    conditional = _write_result(opp, {
+        "eligibility_verdict": "conditional",
+        "eligibility_rationale": "Every gate passes; the unit may be opened after the award.",
+        "caps": [],
+        "commitments": [
+            {"kind": "operating_unit",
+             "requirement": "sede operativa nella regione entro 12 mesi dalla concessione",
+             "due_when": "at_award", "due_months": "12",
+             "cost_note": "A registered unit in a region with no current presence."},
+            {"kind": "co_funding", "requirement": "cofinanziamento del 20%",
+             "due_when": "at_first_payment", "due_months": "",
+             "cost_note": "About 40k of own money."}],
+        "product_fit": [],
+        "overall_fit_score": 60, "fit_rationale": "Worth it if the unit is wanted anyway.",
+        "best_fit_product_id": None, "effort": "medium"})
+    check("evaluator can return a conditional verdict", conditional["outcome"] == "conditional")
+    with get_db() as db:
+        commitments = [dict(r) for r in db.execute(
+            "SELECT * FROM opportunity_commitments WHERE opportunity_id=? ORDER BY id",
+            (call_id,))]
+        caps_now = db.execute("SELECT COUNT(*) n FROM opportunity_caps "
+                              "WHERE opportunity_id=?", (call_id,)).fetchone()["n"]
+    check("evaluator writes the commitments", len(commitments) == 2)
+    check("a commitment keeps the requirement verbatim",
+          "entro 12 mesi" in commitments[0]["requirement"])
+    check("a commitment records when it falls due",
+          commitments[0]["due_when"] == "at_award" and commitments[0]["due_months"] == 12)
+    check("a commitment with no stated deadline stores none",
+          commitments[1]["due_months"] is None)
+    check("a re-evaluation replaces the caps of the previous one", caps_now == 0)
+
+    print("\n== the nightly scan is capped ==")
+    from app.discovery.scanner import apply_scan_cap, due_sources
+    with get_db() as db:
+        for i in range(9):
+            db.execute("INSERT INTO sources (name, scan_cadence, enabled) VALUES (?,?,1)",
+                       (f"Capped source {i}", "monthly"))
+        db.execute("UPDATE sources SET last_scanned_at='2020-01-01' WHERE name='Capped source 0'")
+    due = due_sources()
+    check("never-scanned sources come before ones scanned long ago",
+          due and due[0]["last_scanned_at"] is None
+          and due[-1]["name"] == "Capped source 0")
+    capped = apply_scan_cap(due)
+    check("one night touches at most max_scans_per_run sources", len(capped) == 6)
+    with get_db() as db:
+        note = db.execute("SELECT detail FROM scan_log WHERE source_id IS NULL "
+                          "ORDER BY id DESC LIMIT 1").fetchone()
+    check("what was postponed is logged, not silently dropped",
+          note is not None and "postponed" in note["detail"])
+    with get_db() as db:
+        db.execute("DELETE FROM sources WHERE name LIKE 'Capped source %'")
 
     check("a freshly evaluated row is not stale",
           not any(s["id"] == call_id for s in stale_evaluations()))

@@ -46,7 +46,8 @@
         {% else %}<span class="muted">not evaluated</span>{% endif %}
         {% if o.trl_min or o.trl_max %}<br>TRL {{ o.trl_min or '?' }}–{{ o.trl_max or '?' }}{% endif %}
         {% if o.max_company_age_years %}<br>max company age: {{ o.max_company_age_years }} years{% endif %}
-        {% if o.requires_unit_in %}<br>requires a unit in: {{ o.requires_unit_in }}{% endif %}
+        {% if o.requires_unit_in %}<br>requires a unit in: {{ o.requires_unit_in }}
+          {%- if o.unit_required_by %} <span class="sub">({{ o.unit_required_by.replace('_', ' ') }}{% if o.unit_deadline_months %}, {{ o.unit_deadline_months }} months{% endif %}) {{ help('unit_required_by') }}</span>{% endif %}{% endif %}
         {% if o.requires_partners %}<br>partners required{% if o.partner_requirements %}: {{ o.partner_requirements }}{% endif %}{% endif %}
         {% if o.other_requirements %}<br>{{ o.other_requirements }}{% endif %}
       </td></tr>
@@ -59,6 +60,19 @@
             {% if c.max_amount %}— {{ c.comparator or 'lt' }} {{ c.max_amount|money }} {{ c.currency or '' }}{% endif %}
             {% if c.ceiling %}<span class="sub"> (ceiling {{ c.ceiling|money }}, used {{ c.used_amount|money(blank='0') }})</span>{% endif %}
             {% if c.scope_note %}<br><span class="sub">“{{ c.scope_note }}” {{ help('scope_note') }}</span>{% endif %}
+          </div>
+        {% endfor %}
+      </td></tr>
+      {% endif %}
+      {% if commitments %}
+      <tr><th>Commitments {{ help('commitments') }}</th><td>
+        {% for c in commitments %}
+          <div>
+            <span class="chip kind">{{ c.kind.replace('_', ' ') if c.kind else 'other' }}</span>
+            {% if c.due_when %}{{ c.due_when.replace('_', ' ') }}{% endif %}
+            {%- if c.due_months %}, within {{ c.due_months }} months{% endif %}
+            {% if c.requirement %}<br><span class="sub">“{{ c.requirement }}”</span>{% endif %}
+            {% if c.cost_note %}<br><span class="sub">{{ c.cost_note }}</span>{% endif %}
           </div>
         {% endfor %}
       </td></tr>

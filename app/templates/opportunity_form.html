@@ -93,6 +93,8 @@
   <div class="grid2">
     {{ txt('eligible_geographies', 'Eligible geographies (JSON)', o.eligible_geographies, span=true) }}
     {{ txt('requires_unit_in', 'Requires a unit in', o.requires_unit_in) }}
+    {{ sel('unit_required_by', 'Unit required by ' ~ help('unit_required_by'), o.unit_required_by, condition_timing) }}
+    {{ txt('unit_deadline_months', 'Months to open it', o.unit_deadline_months) }}
     {{ txt('max_company_age_years', 'Max company age (years)', o.max_company_age_years) }}
     {{ txt('eligible_sme_sizes', 'Eligible sizes (JSON)', o.eligible_sme_sizes) }}
     {{ txt('requires_qualification', 'Requires qualification (JSON)', o.requires_qualification) }}
