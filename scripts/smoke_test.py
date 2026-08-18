@@ -757,6 +757,16 @@ with TestClient(app) as c:
     check("the link field is a url input",
           re.search(r'<input type="url"[^>]*name="link"', r.text) is not None)
 
+    # A `?` inside a record modal used to replace that modal with the
+    # explanation: asking what a field meant threw away the record you were
+    # reading it about. The two layers must stay separate containers.
+    check("help opens in its own layer, not over the record modal",
+          'hx-target="#help-modal"' in r.text and 'id="help-modal"' in r.text)
+    h = c.get("/help/eligibility")
+    check("closing the explanation clears only the help layer",
+          "getElementById('help-modal')" in h.text
+          and "getElementById('modal')" not in h.text)
+
     print("\n== multi-value fields ==")
     r = c.get("/opportunities/new")
     # A datalist cannot serve a list: it completes the whole box. These are

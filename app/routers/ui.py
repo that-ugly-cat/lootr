@@ -61,7 +61,7 @@ def _help_button(key: str) -> Markup:
         return Markup("")
     return Markup(
         f'<button type="button" class="help" aria-label="What is this?" '
-        f'title="What is this?" hx-get="/help/{key}" hx-target="#modal">?</button>')
+        f'title="What is this?" hx-get="/help/{key}" hx-target="#help-modal">?</button>')
 
 
 templates.env.globals["help"] = _help_button

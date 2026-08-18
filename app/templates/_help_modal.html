@@ -1,8 +1,12 @@
-<div class="modal-overlay" onclick="if (event.target === this) document.getElementById('modal').innerHTML = '';">
+{# Help lives in its own container, layered above `#modal`. Sharing one meant a
+   `?` inside an opportunity modal replaced that modal with the explanation, and
+   closing the explanation left nothing: asking what a field meant threw away
+   the record you were reading it about. #}
+<div class="modal-overlay help-overlay" onclick="if (event.target === this) document.getElementById('help-modal').innerHTML = '';">
   <div class="modal-card help-card">
     <div class="modal-head">
       <h2>{{ title }}</h2>
-      <button class="modal-close" onclick="document.getElementById('modal').innerHTML = '';">✕</button>
+      <button class="modal-close" onclick="document.getElementById('help-modal').innerHTML = '';">✕</button>
     </div>
     <div class="help-body">{{ body|safe }}</div>
   </div>
