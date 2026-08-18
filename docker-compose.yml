@@ -1,0 +1,15 @@
+services:
+  lootr:
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    container_name: lootr
+    ports:
+      - "127.0.0.1:8016:8016"
+    env_file: .env
+    environment:
+      - LOOTR_DB=/data/lootr.db
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
