@@ -60,11 +60,41 @@ REQUEST_TIMEOUT = 600.0   # one model call, including its server-side searches
 MAX_RETRIES = 1           # a retry of a ten-minute call is expensive to be wrong about
 SOURCE_DEADLINE = 900.0   # wall clock for one source, checked between turns
 
+# Breathing room between sources in one run. Server-side search has its own
+# budget, and three long scans back to back exhausted it on 18 August: the
+# fourth ran half blind and said so in its notes. A minute between sources is a
+# guess, not a measurement — raise it if degraded runs keep appearing.
+SOURCE_PAUSE = 60.0
+
 
 def client() -> anthropic.Anthropic:
     """The API client, with limits. Shared by scanner, verifier and evaluator so
     none of them can be the one that hangs."""
     return anthropic.Anthropic(timeout=REQUEST_TIMEOUT, max_retries=MAX_RETRIES)
+
+
+def search_refused(response) -> bool:
+    """True when the server-side search tool refused during this turn.
+
+    A scan whose searches were cut off is not a scan that found nothing: it is
+    a scan that could not look. Both file zero proposals, so without this the
+    two are the same row in the log — and the quiet one is the dangerous one.
+    """
+    for block in response.content:
+        if getattr(block, "type", "") != "web_search_tool_result":
+            continue
+        content = getattr(block, "content", None)
+        if getattr(content, "error_code", None) or str(
+                getattr(content, "type", "")).endswith("error"):
+            return True
+    return False
+
+
+def counts_as_done(outcome: str) -> bool:
+    """Whether a scan may stamp the source as scanned. A degraded run must not:
+    it did half the job, and marking it done would hide the half it missed
+    until the cadence came round again."""
+    return outcome == "ok"
 
 
 def turn(api: anthropic.Anthropic, **kwargs):
@@ -303,6 +333,7 @@ def scan_source(source: dict) -> dict:
     tools = [WEB_SEARCH_TOOL, SUBMIT_TOOL]
     proposals = None
     notes = ""
+    degraded = False
     deadline = time.monotonic() + SOURCE_DEADLINE
 
     for _ in range(MAX_TURNS):
@@ -321,6 +352,7 @@ def scan_source(source: dict) -> dict:
             tools=tools,
             messages=messages,
         )
+        degraded = degraded or search_refused(response)
 
         # Check the stop reason before reading content: a refusal carries no
         # answer, and an empty content list would break the search below.
@@ -347,7 +379,9 @@ def scan_source(source: dict) -> dict:
                 "detail": "no submit_proposals call"}
 
     stored = _store_proposals(source, proposals)
-    return {"source": source["name"], "outcome": "ok",
+    degraded = degraded or "limit exceeded" in notes.lower()
+    return {"source": source["name"],
+            "outcome": "degraded" if degraded else "ok",
             "proposed": len(proposals), "stored": stored, "notes": notes}
 
 
@@ -436,9 +470,14 @@ def run_scan(source_id: int | None = None, only_due: bool = False) -> list[dict]
                 "WHERE id=?",
                 (result["outcome"], json.dumps(result, ensure_ascii=False), log_id),
             )
-            if result["outcome"] == "ok":
+            if counts_as_done(result["outcome"]):
                 db.execute("UPDATE sources SET last_scanned_at=CURRENT_TIMESTAMP "
                            "WHERE id=?", (source["id"],))
         print(f"[scan] {result}")
         results.append(result)
+        # Server-side search has a budget of its own, and back-to-back scans
+        # spend it: the source that runs last would be the one that runs blind.
+        # Nothing waits on the night, so the night can afford to wait.
+        if n < len(sources):
+            time.sleep(SOURCE_PAUSE)
     return results

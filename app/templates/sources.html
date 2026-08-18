@@ -90,7 +90,9 @@
     <tr>
       <td class="sub nowrap">{{ l.started_at }}</td>
       <td>{{ l.source_name or 'all' }}</td>
-      <td><span class="chip {% if l.outcome == 'ok' %}v-pass{% else %}v-fail{% endif %}">{{ l.outcome }}</span></td>
+      {# Three outcomes, not two: a scan whose searches were cut off did not
+         fail, but it did not do the job either. #}
+      <td><span class="chip {% if l.outcome == 'ok' %}v-pass{% elif l.outcome in ('degraded', 'interrupted') %}v-uncertain{% else %}v-fail{% endif %}">{{ l.outcome }}</span></td>
       {# A scan that found nothing has to account for itself: "nothing found" and
          "nothing looked for" are the same number of proposals. #}
       <td class="sub">

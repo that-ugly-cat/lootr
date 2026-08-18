@@ -820,6 +820,29 @@ with TestClient(app) as c:
           "getElementById('help-modal')" in h.text
           and "getElementById('modal')" not in h.text)
 
+    print("\n== a half-blind scan says so ==")
+    from types import SimpleNamespace
+    from app.discovery.scanner import (SOURCE_PAUSE, counts_as_done, search_refused)
+
+    def _turn(*blocks):
+        return SimpleNamespace(content=list(blocks))
+
+    ok_turn = _turn(SimpleNamespace(type="web_search_tool_result",
+                                    content=[{"title": "a result"}]))
+    refused = _turn(SimpleNamespace(
+        type="web_search_tool_result",
+        content=SimpleNamespace(type="web_search_tool_result_error",
+                                error_code="max_uses_exceeded")))
+    check("a normal search turn is not flagged", not search_refused(ok_turn))
+    check("a refused search turn is", search_refused(refused))
+    check("a turn with no search at all is not", not search_refused(_turn()))
+    # The dangerous case is the quiet one: a scan that could not look files the
+    # same zero as a scan that looked and found nothing.
+    check("a degraded scan does not count as done", not counts_as_done("degraded"))
+    check("only a clean scan stamps the source", counts_as_done("ok")
+          and not counts_as_done("error") and not counts_as_done("interrupted"))
+    check("sources are spaced out within a run", SOURCE_PAUSE >= 30)
+
     print("\n== nothing runs unbounded ==")
     from app.db import close_interrupted_scans
     from app.discovery.scanner import (MAX_RETRIES, REQUEST_TIMEOUT, SOURCE_DEADLINE,
