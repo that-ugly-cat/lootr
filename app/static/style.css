@@ -107,7 +107,21 @@ button:hover, .btn:hover { background: var(--btn-hover); }
 button.danger, .btn.danger { background: var(--danger-border); }
 button.danger:hover { background: #963030; }
 button.small, .btn.small { padding: 0.2rem 0.6rem; font-size: 0.76rem; }
-.btn.muted { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+/* `muted` on a button means "this is the quieter action", not "this is off".
+   It used to recolour the text and nothing else, which on the filled blue
+   background read as greyed-out — the look the browser gives a control you
+   cannot press, worn by buttons that work. It is now a real outline variant,
+   with readable text, and the greyed-out look belongs to :disabled alone. */
+button.muted, .btn.muted {
+  background: transparent; color: var(--fg); border: 1px solid var(--border);
+}
+button.muted:hover, .btn.muted:hover {
+  background: var(--card-hover); border-color: var(--accent-dim); color: var(--fg);
+}
+button:disabled, button:disabled:hover, .btn.disabled {
+  background: transparent; color: var(--faint); border-color: var(--border);
+  cursor: not-allowed;
+}
 .btn.active { outline: 1px solid var(--accent); }
 
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
