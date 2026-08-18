@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Admin</h1>
+
+{% if new_key %}
+<div class="card highlight">
+  <strong>New API key — copy it now, it is not shown again.</strong>
+  <code class="key">{{ new_key }}</code>
+  <p class="small">MCP capability URL: <code>https://lootr.borant.eu/mcp/k/{{ new_key }}</code></p>
+</div>
+{% endif %}
+
+<h2>Users</h2>
+<table>
+  <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead>
+  <tbody>
+  {% for u in users %}
+    <tr class="{% if not u.active %}row-disabled{% endif %}">
+      <td>{{ u.username }}</td>
+      <td class="sub">{{ u.email }}</td>
+      <td>
+        <form method="post" action="/admin/users/{{ u.id }}/role" class="inline-form">
+          <select name="role" onchange="this.form.submit()">
+            {% for r in ['reader', 'editor', 'admin'] %}
+              <option value="{{ r }}" {% if u.role == r %}selected{% endif %}>{{ r }}</option>{% endfor %}
+          </select>
+        </form>
+      </td>
+      <td>{{ 'yes' if u.active else 'no' }}</td>
+      <td class="actions-inline">
+        <form method="post" action="/admin/users/{{ u.id }}/password" class="inline-form">
+          <input name="password" type="password" placeholder="new password" size="14" required>
+          <button class="small muted" type="submit">set</button>
+        </form>
+        <form method="post" action="/admin/users/{{ u.id }}/toggle">
+          <button class="small muted" type="submit">{{ 'disable' if u.active else 'enable' }}</button></form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<div class="card">
+  <h3>Add a user</h3>
+  <form method="post" action="/admin/users/new" class="inline-form">
+    <input name="username" placeholder="username" required>
+    <input name="email" type="email" placeholder="email" required>
+    <input name="password" type="password" placeholder="password (min 8)" required>
+    <select name="role">
+      {% for r in ['reader', 'editor', 'admin'] %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+    </select>
+    <button type="submit">Add</button>
+  </form>
+</div>
+
+<h2>API keys</h2>
+<p class="small muted">
+  One key opens both the REST dump (<code>X-API-Key</code>) and the MCP surface,
+  either by header or through the capability URL. Revoking is immediate.
+</p>
+<table>
+  <thead><tr><th>Label</th><th>Created</th><th>Last used</th><th>Active</th><th></th></tr></thead>
+  <tbody>
+  {% for k in api_keys %}
+    <tr class="{% if not k.active %}row-disabled{% endif %}">
+      <td>{{ k.label }}</td>
+      <td class="sub nowrap">{{ k.created_at }}</td>
+      <td class="sub nowrap">{{ k.last_used_at or 'never' }}</td>
+      <td>{{ 'yes' if k.active else 'revoked' }}</td>
+      <td class="actions-inline">
+        {% if k.active %}
+        <form method="post" action="/admin/keys/{{ k.id }}/revoke">
+          <button class="small danger" type="submit">revoke</button></form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted small">No keys yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<div class="card">
+  <form method="post" action="/admin/keys/new" class="inline-form">
+    <input name="label" placeholder="label (who or what uses it)" required>
+    <button type="submit">Create key</button>
+  </form>
+</div>
+
+<h2>Configuration</h2>
+<p class="small muted">
+  Ceilings, vocabularies and model choices are data, not constants. Change them here.
+</p>
+<table>
+  <thead><tr><th>Key</th><th>Value</th><th>Note</th></tr></thead>
+  <tbody>
+  {% for c in config %}
+    <tr>
+      <td><code>{{ c.key }}</code></td>
+      <td>
+        <form method="post" action="/admin/config/{{ c.key }}" class="inline-form">
+          <input name="value" value="{{ c.value or '' }}" size="24">
+          <button class="small muted" type="submit">save</button>
+        </form>
+      </td>
+      <td class="sub">{{ c.note or '' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

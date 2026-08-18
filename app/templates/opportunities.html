@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="tabs">
+  <a href="/calls" class="{% if view == 'calls' %}on{% endif %}">Calls</a>
+  <a href="/investors" class="{% if view == 'investors' %}on{% endif %}">Investors</a>
+</div>
+
+<div class="toolbar">
+  <form class="filters" hx-get="/{{ view }}" hx-target="#table" hx-trigger="change, keyup delay:350ms from:input[name='q']">
+    <input type="search" name="q" value="{{ q }}" placeholder="search…">
+    <select name="instrument">
+      <option value="">any instrument</option>
+      {% for i in instruments %}<option value="{{ i }}" {% if f_instrument == i %}selected{% endif %}>{{ i }}</option>{% endfor %}
+    </select>
+    <select name="provider_type">
+      <option value="">any provider</option>
+      {% for p in providers %}<option value="{{ p }}" {% if f_provider == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+    </select>
+    <select name="source">
+      <option value="">any source</option>
+      <option value="__none__" {% if f_source == '__none__' %}selected{% endif %}>(no source)</option>
+      {% for s in sources %}<option value="{{ s.id }}" {% if f_source == s.id|string %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+    </select>
+    <select name="status">
+      <option value="open" {% if f_status == 'open' %}selected{% endif %}>open</option>
+      <option value="expired" {% if f_status == 'expired' %}selected{% endif %}>expired</option>
+      <option value="shortlisted" {% if f_status == 'shortlisted' %}selected{% endif %}>shortlisted</option>
+      <option value="preparing" {% if f_status == 'preparing' %}selected{% endif %}>preparing</option>
+      <option value="submitted" {% if f_status == 'submitted' %}selected{% endif %}>submitted</option>
+      <option value="won" {% if f_status == 'won' %}selected{% endif %}>won</option>
+      <option value="lost" {% if f_status == 'lost' %}selected{% endif %}>lost</option>
+      <option value="" {% if not f_status %}selected{% endif %}>any status</option>
+    </select>
+  </form>
+  {% if user.role in ('admin', 'editor') %}
+    <a class="btn small" href="/opportunities/new?view={{ view }}">+ add</a>
+  {% endif %}
+</div>
+
+<div id="table">
+  {% include "_opportunities_table.html" %}
+</div>
+{% endblock %}

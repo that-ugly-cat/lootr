@@ -1,0 +1,128 @@
+<div class="modal-overlay" onclick="if (event.target === this) document.getElementById('modal').innerHTML = '';">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>{{ o.title }}</h2>
+      <button class="modal-close" onclick="document.getElementById('modal').innerHTML = '';">✕</button>
+    </div>
+    <p class="small muted">
+      {{ o.provider or 'no provider' }}{% if o.provider_type %} · {{ o.provider_type }}{% endif %}
+      · <span class="chip">{{ o.instrument or 'no instrument' }}</span>
+      {% if o.dilutive %}<span class="chip">dilutive</span>{% endif %}
+      {% if o.source_name %} · source: {{ o.source_name }}{% endif %}
+    </p>
+    {% if o.description %}<p class="small">{{ o.description }}</p>{% endif %}
+
+    <table class="detail">
+      {% if o.amount_min or o.amount_max or o.funding_rate_pct %}
+      <tr><th>Money</th><td>
+        {% if o.amount_min or o.amount_max %}{{ o.amount_min|money }}–{{ o.amount_max|money }} {{ o.currency or '' }}{% endif %}
+        {% if o.funding_rate_pct %} · covers {{ o.funding_rate_pct|pct }}{% endif %}
+        {% if o.cofinancing_pct %} · co-financing {{ o.cofinancing_pct|pct }}{% endif %}
+        {% if o.disbursement %}<br>paid: {{ o.disbursement }}{% if o.advance_available %} (advance available){% endif %}{% endif %}
+        {% if o.aid_regime %}<br>aid regime: {{ o.aid_regime }}{% endif %}
+      </td></tr>
+      {% endif %}
+      <tr><th>Deadline</th><td>
+        {{ o.deadline_date or o.deadline_text or '—' }}
+        {% if o.deadline_type %} <span class="chip">{{ o.deadline_type }}</span>{% endif %}
+        {% if o.recurrence_logic %}<br>{{ o.recurrence_logic }}{% endif %}
+        {% if o.decision_lag_months %}<br>decision in ~{{ o.decision_lag_months }} months{% endif %}
+      </td></tr>
+      {% if o.ticket_min or o.ticket_max or o.stage_focus %}
+      <tr><th>Thesis</th><td>
+        {% if o.ticket_min or o.ticket_max %}ticket {{ o.ticket_min|money }}–{{ o.ticket_max|money }} {{ o.currency or '' }}<br>{% endif %}
+        {% if o.stage_focus %}stage: {{ o.stage_focus }}<br>{% endif %}
+        {% if o.sector_focus %}sector: {{ o.sector_focus }}<br>{% endif %}
+        {% if o.geo_focus %}geography: {{ o.geo_focus }}{% endif %}
+        {% if o.lead_or_follow %} · {{ o.lead_or_follow }}{% endif %}
+      </td></tr>
+      {% endif %}
+      <tr><th>Eligibility</th><td>
+        {% if o.eligibility_verdict %}
+          <span class="chip v-{{ o.eligibility_verdict }}">{{ o.eligibility_verdict }}</span>
+          {% if o.eligibility_rationale %}<br>{{ o.eligibility_rationale }}{% endif %}
+        {% else %}<span class="muted">not evaluated</span>{% endif %}
+        {% if o.trl_min or o.trl_max %}<br>TRL {{ o.trl_min or '?' }}–{{ o.trl_max or '?' }}{% endif %}
+        {% if o.max_company_age_years %}<br>max company age: {{ o.max_company_age_years }} years{% endif %}
+        {% if o.requires_unit_in %}<br>requires a unit in: {{ o.requires_unit_in }}{% endif %}
+        {% if o.requires_partners %}<br>partners required{% if o.partner_requirements %}: {{ o.partner_requirements }}{% endif %}{% endif %}
+        {% if o.other_requirements %}<br>{{ o.other_requirements }}{% endif %}
+      </td></tr>
+      {% if caps %}
+      <tr><th>Caps</th><td>
+        {% for c in caps %}
+          <div>
+            <span class="chip {% if c.verdict %}v-{{ c.verdict }}{% endif %}">{{ c.verdict or 'unchecked' }}</span>
+            {{ c.counter_label or c.counter_key }}
+            {% if c.max_amount %}— {{ c.comparator or 'lt' }} {{ c.max_amount|money }} {{ c.currency or '' }}{% endif %}
+            {% if c.ceiling %}<span class="sub"> (ceiling {{ c.ceiling|money }}, used {{ c.used_amount|money(blank='0') }})</span>{% endif %}
+            {% if c.scope_note %}<br><span class="sub">“{{ c.scope_note }}”</span>{% endif %}
+          </div>
+        {% endfor %}
+      </td></tr>
+      {% endif %}
+      {% if fits %}
+      <tr><th>Product fit</th><td>
+        {% for f in fits %}
+          <div>
+            <span class="chip v-{{ f.verdict }}">{{ f.verdict }}</span>
+            {{ f.product_name }}{% if f.trl is not none %} <span class="sub">(TRL {{ f.trl }})</span>{% endif %}
+            {% if f.fit_score is not none %} — {{ f.fit_score }}/100{% endif %}
+            {% if f.rationale %}<br><span class="sub">{{ f.rationale }}</span>{% endif %}
+          </div>
+        {% endfor %}
+      </td></tr>
+      {% endif %}
+      {% if o.effort or o.priority %}
+      <tr><th>Triage</th><td>
+        {% if o.effort %}effort: {{ o.effort }}{% endif %}
+        {% if o.priority %} · priority: {{ o.priority }}{% endif %}
+      </td></tr>
+      {% endif %}
+      {% if applications %}
+      <tr><th>Applications</th><td>
+        {% for a in applications %}
+          <div>{{ a.status }}{% if a.product_name %} · {{ a.product_name }}{% endif %}
+          {% if a.amount_requested %} · asked {{ a.amount_requested|money }}{% endif %}
+          {% if a.next_action %}<br><span class="sub">next: {{ a.next_action }} ({{ a.next_action_due or 'no date' }})</span>{% endif %}</div>
+        {% endfor %}
+      </td></tr>
+      {% endif %}
+      {% if contacts %}
+      <tr><th>Contacts</th><td>
+        {% for c in contacts %}
+          <div>{{ c.name }}{% if c.role %}, {{ c.role }}{% endif %}
+          {% if c.relationship %}<span class="chip">{{ c.relationship }}</span>{% endif %}
+          {% if c.warm_intro_via %}<br><span class="sub">intro via {{ c.warm_intro_via }}</span>{% endif %}</div>
+        {% endfor %}
+      </td></tr>
+      {% endif %}
+      {% if activities %}
+      <tr><th>Diary</th><td>
+        {% for a in activities %}
+          <div><span class="sub">{{ a.happened_at }}</span> · {{ a.kind }}{% if a.contact_name %} with {{ a.contact_name }}{% endif %}<br>{{ a.summary }}</div>
+        {% endfor %}
+      </td></tr>
+      {% endif %}
+      <tr><th>Link</th><td>
+        {% if o.link %}<a href="{{ o.link }}" target="_blank" rel="noopener">{{ o.link }}</a>{% else %}—{% endif %}
+        {% if o.link_status and o.link_status != 'ok' %} <span class="chip v-not_eligible">{{ o.link_status }}</span>{% endif %}
+      </td></tr>
+      <tr><th>Checked</th><td class="sub">
+        link {{ o.last_checked_at or 'never' }} · record {{ o.last_verified_at or 'never' }} · origin {{ o.origin }}
+      </td></tr>
+    </table>
+
+    {% if user.role in ('admin', 'editor') %}
+    <div class="actions">
+      <a class="btn small" href="/opportunities/{{ o.id }}/edit">Edit</a>
+      {% if user.role == 'admin' %}
+      <form method="post" action="/opportunities/{{ o.id }}/delete"
+            onsubmit="return confirm('Delete this opportunity and its proposals?');">
+        <button class="small danger" type="submit">Delete</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>

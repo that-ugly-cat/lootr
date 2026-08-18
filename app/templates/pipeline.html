@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% set can_edit = user.role in ('admin', 'editor') %}
+{% block content %}
+<h1>Pipeline</h1>
+<p class="small muted">
+  Applications being prepared or filed, and the diary. Sorted by next action:
+  the investor branch has no deadline, only a next step.
+</p>
+
+<div class="toolbar">
+  <form class="filters" method="get" action="/pipeline">
+    <select name="status" onchange="this.form.submit()">
+      <option value="" {% if not f_status %}selected{% endif %}>any status</option>
+      {% for s in states %}<option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<table>
+  <thead><tr>
+    <th>Opportunity</th><th>Product</th><th>Status</th><th>Asked</th>
+    <th>Next action</th><th>Owner</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for a in applications %}
+    <tr>
+      <td><div class="stack"><strong>{{ a.title or '—' }}</strong>
+        <span class="sub">{{ a.provider or '' }}{% if a.deadline_date %} · due {{ a.deadline_date }}{% endif %}</span></div></td>
+      <td class="sub">{{ a.product_name or '—' }}</td>
+      <td>
+        {% if can_edit %}
+        <form method="post" action="/pipeline/{{ a.id }}/edit" class="inline-form">
+          <input type="hidden" name="opportunity_id" value="{{ a.opportunity_id }}">
+          <input type="hidden" name="product_id" value="{{ a.product_id or '' }}">
+          <input type="hidden" name="amount_requested" value="{{ a.amount_requested or '' }}">
+          <input type="hidden" name="notes" value="{{ a.notes or '' }}">
+          <select name="status" onchange="this.form.submit()">
+            {% for s in states %}<option value="{{ s }}" {% if a.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+          <input type="hidden" name="next_action" value="{{ a.next_action or '' }}">
+          <input type="hidden" name="next_action_due" value="{{ a.next_action_due or '' }}">
+        </form>
+        {% else %}<span class="chip">{{ a.status }}</span>{% endif %}
+      </td>
+      <td class="nowrap">{% if a.amount_requested %}{{ a.amount_requested|money }} {{ a.currency or '' }}{% else %}—{% endif %}</td>
+      <td class="{% if a.next_action_due and a.next_action_due <= today %}due-soon{% endif %}">
+        {% if a.next_action %}{{ a.next_action }}<br><span class="sub">{{ a.next_action_due or 'no date' }}</span>{% else %}—{% endif %}
+      </td>
+      <td class="sub">{{ a.owner or '—' }}</td>
+      <td class="actions-inline">
+        {% if can_edit %}
+        <form method="post" action="/pipeline/{{ a.id }}/delete" onsubmit="return confirm('Remove this application?');">
+          <button class="small danger" type="submit">×</button></form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="muted small">Nothing in the pipeline.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if can_edit %}
+<div class="card">
+  <h3>Add an application</h3>
+  <form method="post" action="/pipeline/new">
+    <div class="grid2">
+      <label class="span2">Opportunity
+        <select name="opportunity_id" required>
+          <option value="">—</option>
+          {% for o in opportunities %}<option value="{{ o.id }}">{{ o.title }}</option>{% endfor %}
+        </select></label>
+      <label>Product
+        <select name="product_id">
+          <option value="">—</option>
+          {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select></label>
+      <label>Status
+        <select name="status">
+          {% for s in states %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select></label>
+      <label>Amount requested <input name="amount_requested"></label>
+      <label>Currency <input name="currency" placeholder="EUR"></label>
+      <label>Next action <input name="next_action"></label>
+      <label>Due <input type="date" name="next_action_due"></label>
+      <label class="span2">Notes <textarea name="notes" rows="2"></textarea></label>
+    </div>
+    <div class="actions"><button type="submit">Add</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Log an activity</h3>
+  <form method="post" action="/activities/new" class="inline-form">
+    <input type="hidden" name="back" value="/pipeline">
+    <select name="opportunity_id" required>
+      <option value="">opportunity…</option>
+      {% for o in opportunities %}<option value="{{ o.id }}">{{ o.title }}</option>{% endfor %}
+    </select>
+    <select name="kind">
+      {% for k in ['call', 'email', 'meeting', 'pitch', 'intro', 'submission'] %}<option>{{ k }}</option>{% endfor %}
+    </select>
+    <input type="date" name="happened_at">
+    <input name="contact_name" placeholder="contact">
+    <input name="summary" placeholder="what happened" size="40">
+    <button class="small" type="submit">log</button>
+  </form>
+</div>
+{% endif %}
+
+<h2>Recent activity</h2>
+<table>
+  <thead><tr><th>Date</th><th>Kind</th><th>Opportunity</th><th>Summary</th></tr></thead>
+  <tbody>
+  {% for a in activities %}
+    <tr>
+      <td class="nowrap sub">{{ a.happened_at }}</td>
+      <td><span class="chip">{{ a.kind }}</span></td>
+      <td>{{ a.title or '—' }}</td>
+      <td>{{ a.summary }}{% if a.contact_name %} <span class="sub">— {{ a.contact_name }}</span>{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4" class="muted small">No activity logged yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

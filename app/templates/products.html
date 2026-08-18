@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section-head">
+  <h1>Product lines</h1>
+  {% if user.role in ('admin', 'editor') %}<a class="btn small" href="/products/new">+ add</a>{% endif %}
+</div>
+<p class="small muted">
+  TRL lives here, not on the company: a call asking for TRL 6–8 may fit one line and
+  not another, so eligibility is evaluated per pair of opportunity and product.
+</p>
+
+<table>
+  <thead><tr>
+    <th>Name</th><th>Status</th><th>TRL</th><th>IP</th><th>Regulatory</th><th>Segments</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for p in products %}
+    <tr class="{% if not p.active %}row-disabled{% endif %}">
+      <td><div class="stack"><strong>{{ p.name }}</strong>
+        {% if p.description %}<span class="sub">{{ p.description[:90] }}{% if p.description|length > 90 %}…{% endif %}</span>{% endif %}</div></td>
+      <td><span class="chip">{{ p.status or '—' }}</span></td>
+      <td>{% if p.trl is not none %}{{ p.trl }}{% if p.trl_updated_at %}<br><span class="sub">{{ p.trl_updated_at }}</span>{% endif %}{% else %}—{% endif %}</td>
+      <td>{{ p.ip_status or '—' }}</td>
+      <td>{% if p.regulatory_framework %}{{ p.regulatory_framework }}<br><span class="sub">{{ p.regulatory_status or '' }}</span>{% else %}—{% endif %}</td>
+      <td class="sub">{{ p.target_segments or '—' }}</td>
+      <td class="actions-inline">
+        {% if user.role in ('admin', 'editor') %}<a class="btn small muted" href="/products/{{ p.id }}/edit">edit</a>{% endif %}
+        {% if user.role == 'admin' %}
+        <form method="post" action="/products/{{ p.id }}/delete" onsubmit="return confirm('Delete this product line?');">
+          <button class="small danger" type="submit">×</button></form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="muted small">No product lines yet. Add one before running an evaluation.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

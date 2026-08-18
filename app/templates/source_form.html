@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Edit source</h1>
+<form method="post" action="/sources/{{ source.id }}/edit">
+<div class="card">
+  <div class="grid2">
+    <label>Name <input name="name" value="{{ source.name or '' }}" required></label>
+    <label>URL <input name="url" value="{{ source.url or '' }}"></label>
+    <label>Geography <input name="geo_hint" value="{{ source.geo_hint or '' }}"></label>
+    <label>Instruments <input name="instrument_hint" value="{{ source.instrument_hint or '' }}"></label>
+    <label>Cadence
+      <select name="scan_cadence">
+        {% for c in ['', 'weekly', 'monthly', 'quarterly'] %}
+          <option value="{{ c }}" {% if source.scan_cadence == c %}selected{% endif %}>{{ c or 'default' }}</option>{% endfor %}
+      </select></label>
+    <label class="span2">Search hints <textarea name="hints" rows="3">{{ source.hints or '' }}</textarea></label>
+  </div>
+</div>
+<div class="actions">
+  <button type="submit">Save</button>
+  <a class="btn muted" href="/sources">Cancel</a>
+</div>
+</form>
+{% endblock %}

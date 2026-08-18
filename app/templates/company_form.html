@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Company core data</h1>
+<p class="small muted">
+  Only fields that are a hard eligibility filter, an ingredient of the scan prompt,
+  or an input to the fit score. Everything else belongs in the narrative sections.
+</p>
+
+<form method="post" action="/profile/edit">
+<div class="card">
+  <div class="grid2">
+    <label class="span2">Legal name <input name="legal_name" value="{{ c.legal_name or '' }}"></label>
+    <label>Legal form <input name="legal_form" value="{{ c.legal_form or '' }}" placeholder="srl"></label>
+    <label>Country (ISO) <input name="country" value="{{ c.country or '' }}" placeholder="IT"></label>
+    <label>VAT number <input name="vat_number" value="{{ c.vat_number or '' }}"></label>
+    <label>Registry id <input name="registry_id" value="{{ c.registry_id or '' }}"></label>
+    <label class="span2">Industry codes (JSON)
+      <input name="industry_codes" value="{{ c.industry_codes or '' }}"
+             placeholder='[{"system":"ATECO","code":"20.59.60"}]'></label>
+    <label>Incorporation date <input type="date" name="incorporation_date" value="{{ c.incorporation_date or '' }}"></label>
+    <label>SME size
+      <select name="sme_size">
+        {% for s in ['', 'micro', 'small', 'medium', 'large'] %}
+          <option value="{{ s }}" {% if c.sme_size == s %}selected{% endif %}>{{ s or '—' }}</option>{% endfor %}
+      </select></label>
+    <label class="span2">Size definition
+      <input name="sme_size_definition" value="{{ c.sme_size_definition or '' }}"
+             placeholder="EU Recommendation 2003/361"></label>
+    <label>Headcount <input name="headcount" value="{{ c.headcount or '' }}"></label>
+    <label>FTE <input name="fte" value="{{ c.fte or '' }}"></label>
+    <label>Last turnover <input name="last_turnover" value="{{ c.last_turnover or '' }}"></label>
+    <label>Total assets <input name="total_assets" value="{{ c.total_assets or '' }}"></label>
+    <label>Currency <input name="currency" value="{{ c.currency or '' }}" placeholder="EUR"></label>
+    <label>Runway (months) <input name="runway_months" value="{{ c.runway_months or '' }}"></label>
+    <label>Revenue stage
+      <select name="revenue_stage">
+        {% for s in ['', 'pre_revenue', 'first_sales', 'recurring'] %}
+          <option value="{{ s }}" {% if c.revenue_stage == s %}selected{% endif %}>{{ s or '—' }}</option>{% endfor %}
+      </select></label>
+    <label>Funding stage
+      <select name="funding_stage">
+        {% for s in ['', 'pre_seed', 'seed', 'series_a', 'series_b', 'later'] %}
+          <option value="{{ s }}" {% if c.funding_stage == s %}selected{% endif %}>{{ s or '—' }}</option>{% endfor %}
+      </select></label>
+    <label class="span2">Impact tags (JSON)
+      <input name="impact_tags" value="{{ c.impact_tags or '' }}"
+             placeholder='["water","climate_adaptation","soil_health"]'></label>
+  </div>
+</div>
+<div class="actions">
+  <button type="submit">Save</button>
+  <a class="btn muted" href="/profile">Cancel</a>
+</div>
+</form>
+{% endblock %}

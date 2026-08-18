@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section-head">
+  <h1>Proposals</h1>
+  <div class="filters">
+    {% for s in ['pending', 'approved', 'rejected'] %}
+      <a class="btn small muted {% if f_status == s %}active{% endif %}" href="/proposals?status={{ s }}">{{ s }}</a>
+    {% endfor %}
+  </div>
+</div>
+<p class="small muted">
+  Discovery proposes, a human decides. Approving is the only path into the
+  opportunities table; decided proposals are never deleted.
+</p>
+
+{% for p in proposals %}
+<div class="card proposal kind-{{ p.kind }}">
+  <div class="proposal-head">
+    <span class="chip kind">{{ p.kind }}</span>
+    <strong>{{ p.opportunity_title or (p.payload | fromjson).get('title') or 'untitled' }}</strong>
+    <span class="chip conf-{{ p.confidence or 'medium' }}">{{ p.confidence or 'medium' }}</span>
+    <span class="chip">{{ p.method }}</span>
+    <span class="sub">{{ p.created_at }}</span>
+  </div>
+  {% if p.rationale %}<p>{{ p.rationale }}</p>{% endif %}
+  {% if p.source_url %}<p class="small"><a href="{{ p.source_url }}" target="_blank" rel="noopener">{{ p.source_url }}</a></p>{% endif %}
+
+  {% if p.diff %}
+  <table class="diff">
+    <thead><tr><th>Field</th><th>Current</th><th>Proposed</th></tr></thead>
+    <tbody>
+      {% for d in p.diff %}
+      <tr>
+        <td>{{ d.field }}</td>
+        <td class="old">{{ d.old if d.old is not none else '—' }}</td>
+        <td class="new">{{ d.new }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif p.kind != 'flag' %}
+  <p class="small muted">No effective change against the current record.</p>
+  {% endif %}
+
+  {% if p.status == 'pending' and user.role in ('admin', 'editor') %}
+  <div class="actions">
+    <form method="post" action="/proposals/{{ p.id }}/approve"><button type="submit">Approve</button></form>
+    <form method="post" action="/proposals/{{ p.id }}/reject"><button class="danger" type="submit">Reject</button></form>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<p class="muted small">Nothing {{ f_status }}.</p>
+{% endfor %}
+{% endblock %}

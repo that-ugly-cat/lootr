@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% set can_edit = user.role in ('admin', 'editor') %}
+{% block content %}
+
+<div class="section-head">
+  <h1>{{ p.company.legal_name or 'Company profile' }}</h1>
+  {% if can_edit %}<a class="btn small" href="/profile/edit">Edit core data</a>{% endif %}
+</div>
+<p class="small muted">
+  This profile is injected into every scan and every evaluation. What is missing here
+  is missing from the judgement.
+</p>
+
+<table class="detail">
+  <tr><th>Legal</th><td>
+    {{ p.company.legal_form or '—' }}{% if p.company.country %} · {{ p.company.country }}{% endif %}
+    {% if p.company.vat_number %} · VAT {{ p.company.vat_number }}{% endif %}
+    {% if p.company.industry_codes %}<br>{{ p.company.industry_codes }}{% endif %}
+  </td></tr>
+  <tr><th>Age</th><td>
+    {% if p.company.incorporation_date %}
+      incorporated {{ p.company.incorporation_date }} — <strong>{{ p.age_years }} years old</strong>
+      <span class="sub">(derived, never stored)</span>
+    {% else %}<span class="muted">incorporation date not set</span>{% endif %}
+  </td></tr>
+  <tr><th>Size</th><td>
+    {{ p.company.sme_size or '—' }}
+    {% if p.company.headcount %} · {{ p.company.headcount }} people{% endif %}
+    {% if p.company.fte %} · {{ p.company.fte }} FTE{% endif %}
+    {% if p.company.last_turnover %}<br>turnover {{ p.company.last_turnover|money }} {{ p.company.currency or '' }}{% endif %}
+    {% if p.company.sme_size_definition %}<br><span class="sub">{{ p.company.sme_size_definition }}</span>{% endif %}
+  </td></tr>
+  <tr><th>Stage</th><td>
+    {{ p.company.funding_stage or '—' }} · {{ p.company.revenue_stage or '—' }}
+    {% if p.company.runway_months %} · runway {{ p.company.runway_months }} months{% endif %}
+    {% if p.max_active_trl is not none %}<br>highest active TRL: {{ p.max_active_trl }} <span class="sub">(from products)</span>{% endif %}
+  </td></tr>
+  <tr><th>Team gates</th><td class="sub">
+    {{ p.team_derived.headcount_active }} active ·
+    female founder: {{ 'yes' if p.team_derived.has_female_founder else 'no' }} ·
+    doctorate holders: {{ p.team_derived.doctorate_holders }}
+    <br>derived from the team table, so a departure changes them the moment it is recorded
+  </td></tr>
+  <tr><th>Impact</th><td>{{ p.company.impact_tags or '—' }}</td></tr>
+</table>
+
+<h2>Cumulative caps</h2>
+<div class="counters">
+  {% for c in p.counters %}
+  <div class="counter">
+    <div class="k">{{ c.label }}</div>
+    <div class="v">
+      {% if c.ceiling %}{{ c.headroom|money }}<span class="sub"> left of {{ c.ceiling|money }}</span>
+      {% else %}{{ c.used_amount|money(blank='0') }} <span class="sub">{{ c.currency }}</span>{% endif %}
+    </div>
+    <div class="sub">
+      used {{ c.used_amount|money(blank='0') }}
+      {% if c.window_years %} · rolling {{ c.window_years }}y window{% else %} · lifetime{% endif %}
+      {% if c.ledger_cross_check is defined and c.ledger_cross_check and (c.ledger_cross_check - (c.used_amount or 0))|abs > 1 %}
+        <br><span class="drift">ledger says {{ c.ledger_cross_check|money }}</span>
+      {% endif %}
+      {% if c.checked_at %}<br>verified {{ c.checked_at }}{% else %}<br>never verified against the source{% endif %}
+    </div>
+    {% if can_edit %}
+    <form method="post" action="/profile/counters/{{ c.key }}" class="inline-form" style="margin-top:.5rem">
+      <input name="used_amount" value="{{ c.used_amount or 0 }}" size="8" title="used">
+      <input name="ceiling" value="{{ c.ceiling or '' }}" size="8" title="ceiling">
+      <input name="checked_at" type="date" value="{{ c.checked_at or '' }}" title="verified on">
+      <input type="hidden" name="source_note" value="{{ c.source_note or '' }}">
+      <button class="small" type="submit">save</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% macro child(slug, title, rows, cols, form_fields, hint='') %}
+<details class="section">
+  <summary>{{ title }} ({{ rows|length }})</summary>
+  <div class="body">
+    {% if hint %}<p class="small muted">{{ hint }}</p>{% endif %}
+    <table>
+      <thead><tr>{% for label, key in cols %}<th>{{ label }}</th>{% endfor %}{% if can_edit %}<th></th>{% endif %}</tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>{% for label, key in cols %}<td>{{ r[key] if r[key] is not none else '—' }}</td>{% endfor %}
+        {% if can_edit %}<td class="actions-inline">
+          <form method="post" action="/profile/{{ slug }}/{{ r.id }}/delete" onsubmit="return confirm('Delete this row?');">
+            <button class="small danger" type="submit">×</button></form></td>{% endif %}
+        </tr>
+      {% else %}
+        <tr><td colspan="{{ cols|length + 1 }}" class="muted small">Empty.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if can_edit %}
+    <form method="post" action="/profile/{{ slug }}/new" class="inline-form">
+      {% for name, placeholder in form_fields %}<input name="{{ name }}" placeholder="{{ placeholder }}">{% endfor %}
+      <button class="small" type="submit">add</button>
+    </form>
+    {% endif %}
+  </div>
+</details>
+{% endmacro %}
+
+<h2>Structure</h2>
+
+{{ child('locations', 'Locations', p.all_locations,
+   [('Kind','kind'),('City','city'),('Region','region'),('Code','region_code'),('System','code_system'),('Registered','registered')],
+   [('kind','kind'),('city','city'),('country','country'),('region','region'),('region_code','region code'),('code_system','NUTS'),('registered','1')],
+   'Regional eligibility is decided here: many schemes want a formally registered operating unit inside the region.') }}
+
+{{ child('qualifications', 'Qualifications', p.all_qualifications,
+   [('Key','key'),('Label','label'),('Jurisdiction','jurisdiction'),('Status','status'),('Valid until','valid_until'),('Confirmed','confirmed_at')],
+   [('key','key'),('label','label'),('jurisdiction','IT'),('status','active'),('valid_until','valid until'),('confirmed_at','confirmed on'),('renewal_every_months','12')],
+   'Legal statuses, certifications and labels with a validity window. Also the home for things that are themselves keys to other funding.') }}
+
+{{ child('team', 'Team', p.all_team,
+   [('Name','name'),('Role','role'),('Founder','is_founder'),('Degree','highest_degree'),('Joined','joined_at'),('Left','left_at')],
+   [('name','name'),('role','role'),('is_founder','1'),('gender','f/m'),('birth_year','1990'),('residence_region','region'),('highest_degree','phd'),('joined_at','joined'),('left_at','left')],
+   'Departures keep their row with a leaving date: the track record was built with them.') }}
+
+{{ child('funding', 'Funding history', p.all_funding,
+   [('Instrument','instrument'),('Amount','amount'),('Investor','investor'),('Closed','closed_at'),('Converted','converted')],
+   [('instrument','instrument'),('amount','amount'),('currency','EUR'),('investor','investor'),('closed_at','closed on'),('converted','1/0')],
+   'Whether a convertible has converted decides how it counts against equity-raised caps.') }}
+
+{{ child('aid', 'Public aid ledger', p.all_aid,
+   [('Name','name'),('Provider','provider'),('Regime','regime'),('Nominal','nominal_amount'),('GGE','gge_amount'),('Granted','granted_at')],
+   [('name','name'),('provider','provider'),('regime','de_minimis'),('nominal_amount','nominal'),('gge_amount','GGE'),('currency','EUR'),('granted_at','granted on')],
+   'What counts against a ceiling is the gross grant equivalent, on the date of the award decision.') }}
+
+<h2>Narrative</h2>
+<p class="small muted">Markdown, injected verbatim into the scan and evaluation prompts.</p>
+{% for section, content in p.narrative.items() %}
+<details class="section">
+  <summary>{{ section.replace('_', ' ') }} {% if not content %}<span class="narrative-empty">— empty</span>{% endif %}</summary>
+  <div class="body">
+    {% if can_edit %}
+    <form method="post" action="/profile/narrative">
+      <input type="hidden" name="section" value="{{ section }}">
+      <textarea name="content">{{ content }}</textarea>
+      <div class="actions"><button class="small" type="submit">Save</button></div>
+    </form>
+    {% else %}
+      <p class="small">{{ content or 'Empty.' }}</p>
+    {% endif %}
+  </div>
+</details>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>A funding table that watches the horizon by itself</h1>
+<p class="lead">
+  Public calls, prizes, accelerators, subsidised loans and investors are scattered
+  across dozens of pages that change without telling anyone. Lootr keeps them on one
+  table, checks them on a schedule, and files what it finds in a queue a human
+  approves. Nothing enters the table on its own.
+</p>
+
+<div class="pillars">
+  <div class="pillar">
+    <div class="pillar-icon">1</div>
+    <div class="pillar-text">
+      <strong>It knows the company</strong>
+      <span>Legal form, size, locations, qualifications, team and product lines with their
+      own maturity. Every judgement is made against that profile, not in the abstract.</span>
+    </div>
+  </div>
+  <div class="pillar">
+    <div class="pillar-icon">2</div>
+    <div class="pillar-text">
+      <strong>It reads the fine print</strong>
+      <span>Who is eligible, how much of the cost is covered, whether there is an advance,
+      and which cumulative ceilings the money counts against.</span>
+    </div>
+  </div>
+  <div class="pillar">
+    <div class="pillar-icon">3</div>
+    <div class="pillar-text">
+      <strong>A human decides</strong>
+      <span>Discovery proposes, people approve. Decided proposals are never deleted:
+      they are the record of what changed, when, and why.</span>
+    </div>
+  </div>
+</div>
+
+<div class="explainers">
+  <details class="explainer">
+    <summary><span class="badge-r plain">plain words</span> What does it actually do?</summary>
+    <div class="body">
+      <p>Somebody has to keep track of every way a company can be funded. Grant pages,
+      competition deadlines, accelerator batches, the investors worth talking to.
+      It is a job nobody has time for, and the cost of missing one is measured in months.</p>
+      <p>Lootr keeps that list. It goes out on a schedule, looks at the sources it has
+      been told to watch, and comes back with what is new and what has changed. It does
+      not edit the list itself: it writes a proposal, shows what it would change and why,
+      and waits. <strong>Approving is always a human action.</strong></p>
+      <p>Because it holds a profile of the company, it can say something more useful than
+      "here is a grant". It can say which product line the call fits, whether the size and
+      age of the company qualify, and how much of a spending ceiling the money would eat.</p>
+    </div>
+  </details>
+  <details class="explainer">
+    <summary><span class="badge-r geek">geek mode</span> How is it built?</summary>
+    <div class="body">
+      <p>FastAPI and SQLite, HTMX and Jinja2 for the interface, JWT cookies for auth.
+      Discovery runs inside the app: a nightly link monitor with no model in the loop, a
+      per-source semantic scan using Claude with server-side web search and a strict tool
+      that validates the proposal payload, and an evaluator that scores eligibility and fit
+      for each pair of opportunity and product line.</p>
+      <p>The schema is deliberately domain-neutral. Anything sector- or
+      jurisdiction-specific — cumulative ceilings, legal qualifications, tag vocabularies,
+      the source list — is data, not columns. Derived facts such as company age, team
+      composition and remaining headroom are computed on read, so they cannot go stale.</p>
+      <p>There is an MCP surface at <code>/mcp</code> behind a revocable capability URL, and a
+      compact REST dump at <code>/ono</code>, so an assistant can read the whole model and file
+      proposals into the same queue as the scanner.</p>
+    </div>
+  </details>
+</div>
+
+<div class="cta"><a class="btn" href="/login">Sign in</a></div>
+{% endblock %}

@@ -51,33 +51,54 @@ for discovery, Docker behind Caddy.
 ```
 app/
   db.py            authoritative schema, idempotent migrations, digests
-  main.py          FastAPI entrypoint
+  main.py          FastAPI entrypoint, MCP capability-URL middleware
   version.py       commit hash shown in the footer
-  auth.py          JWT cookie auth, API keys            (to come)
-  proposals.py     diff and approval logic              (to come)
-  mcp_server.py    Ono layer, capability URL            (to come)
+  auth.py          JWT cookie auth, three roles, API keys
+  proposals.py     diff and approval logic
+  mcp_server.py    Ono layer: 14 tools over the whole model
+  routers/
+    ui.py            web UI
+    api.py           REST dumps and JSON CRUD
   discovery/
     link_monitor.py  nightly, no LLM                    (to come)
     scanner.py       per-source semantic scan           (to come)
     verifier.py      single-record check                (to come)
     evaluator.py     eligibility, caps and fit score    (to come)
-  routers/
-    ui.py            web UI                             (to come)
-    api.py           REST                               (to come)
 scripts/
-  seed_*.py        company-specific seed, kept out of the schema
+  seed_demo.py     invented data, for looking at the UI
+  smoke_test.py    end-to-end check of everything above
 ```
+
+## Roles
+
+`reader` sees everything and changes nothing. `editor` edits the table, the
+profile and the pipeline, and decides proposals. `admin` also manages users,
+API keys, configuration and deletions.
+
+## The Ono layer
+
+MCP at `/mcp`, behind either an `X-API-Key` header or a revocable capability
+URL `/mcp/k/{key}`. Read tools cover the whole model: company profile with its
+derived values, products, opportunities with caps and per-product fit, pipeline,
+contacts, counters, sources, proposals. Writes are deliberately narrow —
+opportunities can only be *proposed*, and the one direct write is the
+append-only activity diary. Approval never leaves the UI.
+
+REST: `GET /ono/profile` and `GET /ono/opportunities` are compact dumps for LLM
+consumption; `/api/opportunities` is CRUD for scripts.
 
 ## Development
 
 ```bash
 python -m venv .venv && . .venv/Scripts/activate
 pip install -r requirements.txt
+python scripts/seed_demo.py
 uvicorn app.main:app --reload --port 8016
 ```
 
 The database is created on first boot at `./data/lootr.db`, override with
-`LOOTR_DB`.
+`LOOTR_DB`. Run `python scripts/smoke_test.py .` before pushing: it exercises
+pages, roles, the proposals queue, REST and MCP against a throwaway database.
 
 ## Deployment
 

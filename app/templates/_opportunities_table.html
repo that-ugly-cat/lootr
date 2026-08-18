@@ -1,0 +1,68 @@
+<table>
+  <thead>
+    <tr>
+      <th>{% if view == 'investors' %}Investor{% else %}Opportunity{% endif %}</th>
+      <th>Instrument</th>
+      {% if view == 'investors' %}
+        <th>Ticket</th><th>Stage</th><th>Next action</th>
+      {% else %}
+        <th>Amount</th><th>Deadline</th><th>Fit</th>
+      {% endif %}
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for o in opportunities %}
+    <tr class="row-click" hx-get="/opportunities/{{ o.id }}/detail" hx-target="#modal">
+      <td>
+        <div class="stack">
+          <strong>{{ o.title }}</strong>
+          <span class="sub">{{ o.provider or '—' }}{% if o.source_name %} · {{ o.source_name }}{% endif %}</span>
+        </div>
+      </td>
+      <td class="nowrap"><span class="chip">{{ o.instrument or '—' }}</span></td>
+
+      {% if view == 'investors' %}
+        <td class="nowrap">
+          {%- if o.ticket_min or o.ticket_max -%}
+            {{ o.ticket_min|money }}–{{ o.ticket_max|money }} {{ o.currency or '' }}
+          {%- else -%}—{%- endif -%}
+        </td>
+        <td class="sub">{{ o.stage_focus or '—' }}</td>
+        <td class="nowrap {% if o.next_action_due and o.next_action_due <= today %}due-soon{% endif %}">
+          {% if o.next_action %}{{ o.next_action }}<br><span class="sub">{{ o.next_action_due or 'no date' }}</span>{% else %}—{% endif %}
+        </td>
+      {% else %}
+        <td class="nowrap">
+          {%- if o.amount_max -%}{{ o.amount_max|money }} {{ o.currency or '' }}
+          {%- elif o.amount_min -%}from {{ o.amount_min|money }} {{ o.currency or '' }}
+          {%- else -%}—{%- endif -%}
+        </td>
+        <td class="nowrap {% if o.deadline_date and o.deadline_date < today %}deadline-past{% endif %}">
+          {{ o.deadline_date or o.deadline_text or '—' }}
+          {% if o.deadline_type and o.deadline_type != 'fixed' %}<br><span class="sub">{{ o.deadline_type }}</span>{% endif %}
+        </td>
+        <td>
+          {% if o.fit_score is not none %}
+            <span class="fit {% if o.fit_score >= 70 %}fit-hi{% elif o.fit_score < 40 %}fit-lo{% endif %}">
+              <span class="fit-bar"><i style="width: {{ o.fit_score }}%"></i></span>
+              <span>{{ o.fit_score }}</span>
+            </span>
+            {% if o.product_name %}<br><span class="sub">{{ o.product_name }}</span>{% endif %}
+          {% else %}<span class="sub">not evaluated</span>{% endif %}
+        </td>
+      {% endif %}
+
+      <td class="nowrap">
+        <span class="chip">{{ o.status }}</span>
+        {% if o.eligibility_verdict %}
+          <br><span class="chip v-{{ o.eligibility_verdict }}">{{ o.eligibility_verdict.replace('_', ' ') }}</span>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted small">Nothing here yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="small muted">{{ opportunities|length }} row{{ '' if opportunities|length == 1 else 's' }}. Click a row for the full record.</p>

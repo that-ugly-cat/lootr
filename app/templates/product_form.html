@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ 'Edit' if p.id else 'New' }} product line</h1>
+
+<form method="post" action="{{ action }}">
+<div class="card">
+  <div class="grid2">
+    <label class="span2">Name <input name="name" value="{{ p.name or '' }}" required></label>
+    <label class="span2">Description <textarea name="description" rows="3">{{ p.description or '' }}</textarea></label>
+    <label>Status
+      <select name="status">
+        <option value="">—</option>
+        {% for s in states %}<option value="{{ s }}" {% if p.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select></label>
+    <label>TRL <input name="trl" value="{{ p.trl if p.trl is not none else '' }}"></label>
+    <label>TRL updated <input type="date" name="trl_updated_at" value="{{ p.trl_updated_at or '' }}"></label>
+    <label>IP status
+      <select name="ip_status">
+        {% for s in ['', 'none', 'filed', 'pct', 'granted'] %}
+          <option value="{{ s }}" {% if p.ip_status == s %}selected{% endif %}>{{ s or '—' }}</option>{% endfor %}
+      </select></label>
+    <label class="span2">TRL evidence
+      <textarea name="trl_evidence" rows="3" placeholder="What justifies that number. Reused across applications.">{{ p.trl_evidence or '' }}</textarea></label>
+    <label class="span2">IP references <input name="ip_refs" value="{{ p.ip_refs or '' }}"></label>
+    <label>Regulatory framework
+      <input name="regulatory_framework" value="{{ p.regulatory_framework or '' }}"
+             placeholder="which regime applies"></label>
+    <label>Regulatory status
+      <input name="regulatory_status" value="{{ p.regulatory_status or '' }}"
+             placeholder="where we are inside it"></label>
+    <label>Target segments (JSON) <input name="target_segments" value="{{ p.target_segments or '' }}"></label>
+    <label>Target markets (JSON) <input name="target_markets" value="{{ p.target_markets or '' }}"></label>
+    <label class="span2">Impact tags (JSON) <input name="impact_tags" value="{{ p.impact_tags or '' }}"></label>
+    <label class="span2">Unit economics <textarea name="unit_economics" rows="2">{{ p.unit_economics or '' }}</textarea></label>
+    <label class="span2">Notes <textarea name="notes" rows="2">{{ p.notes or '' }}</textarea></label>
+    {% if p.id %}
+    <label>Active <input type="checkbox" name="active" {% if p.active %}checked{% endif %} style="width:auto"></label>
+    {% endif %}
+  </div>
+</div>
+<div class="actions">
+  <button type="submit">Save</button>
+  <a class="btn muted" href="/products">Cancel</a>
+</div>
+</form>
+{% endblock %}

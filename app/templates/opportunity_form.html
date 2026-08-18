@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% macro txt(name, label, value, type='text', span=false) %}
+  <label class="{% if span %}span2{% endif %}">{{ label }}
+    <input type="{{ type }}" name="{{ name }}" value="{{ value if value is not none else '' }}"></label>
+{% endmacro %}
+{% macro yesno(name, label, value) %}
+  <label>{{ label }}
+    <select name="{{ name }}">
+      <option value="" {% if value is none %}selected{% endif %}>unknown</option>
+      <option value="1" {% if value == 1 %}selected{% endif %}>yes</option>
+      <option value="0" {% if value == 0 %}selected{% endif %}>no</option>
+    </select></label>
+{% endmacro %}
+{% block content %}
+<h1>{{ 'Edit' if o.id else 'New' }} opportunity</h1>
+
+<form method="post" action="{{ action }}">
+<input type="hidden" name="view" value="{{ view }}">
+
+<div class="card">
+  <h3>What it is</h3>
+  <div class="grid2">
+    {{ txt('title', 'Title *', o.title, span=true) }}
+    {{ txt('provider', 'Provider', o.provider) }}
+    <label>Provider type
+      <select name="provider_type">
+        <option value="">—</option>
+        {% for p in provider_types %}<option value="{{ p }}" {% if o.provider_type == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+      </select></label>
+    <label>Instrument
+      <select name="instrument">
+        <option value="">—</option>
+        {% for i in instruments %}<option value="{{ i }}" {% if o.instrument == i %}selected{% endif %}>{{ i }}</option>{% endfor %}
+      </select></label>
+    {{ yesno('dilutive', 'Dilutive', o.dilutive) }}
+    {{ txt('link', 'Link', o.link, span=true) }}
+    <label class="span2">Description <textarea name="description" rows="3">{{ o.description or '' }}</textarea></label>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Money</h3>
+  <div class="grid2">
+    {{ txt('amount_min', 'Amount min', o.amount_min) }}
+    {{ txt('amount_max', 'Amount max', o.amount_max) }}
+    {{ txt('currency', 'Currency', o.currency) }}
+    {{ txt('funding_rate_pct', 'Funding rate %', o.funding_rate_pct) }}
+    {{ txt('cofinancing_pct', 'Co-financing %', o.cofinancing_pct) }}
+    {{ yesno('advance_available', 'Advance available', o.advance_available) }}
+    {{ txt('disbursement', 'Disbursement', o.disbursement) }}
+    {{ txt('aid_regime', 'Aid regime', o.aid_regime) }}
+    {{ txt('call_total_budget', 'Total call budget', o.call_total_budget, span=true) }}
+  </div>
+</div>
+
+<div class="card">
+  <h3>Time</h3>
+  <div class="grid2">
+    <label>Deadline type
+      <select name="deadline_type">
+        {% for d in ['', 'fixed', 'cutoffs', 'rolling', 'open_until_funds_exhausted', 'unknown'] %}
+          <option value="{{ d }}" {% if o.deadline_type == d %}selected{% endif %}>{{ d or '—' }}</option>
+        {% endfor %}
+      </select></label>
+    {{ txt('deadline_date', 'Next deadline', o.deadline_date, type='date') }}
+    {{ txt('deadline_text', 'Deadline as written', o.deadline_text) }}
+    {{ txt('cutoff_dates', 'Cut-off dates (JSON)', o.cutoff_dates) }}
+    {{ txt('recurrence_logic', 'Recurrence', o.recurrence_logic) }}
+    {{ txt('opens_at', 'Opens at', o.opens_at, type='date') }}
+    {{ txt('decision_lag_months', 'Decision lag (months)', o.decision_lag_months) }}
+    {{ txt('project_duration_months', 'Project duration (months)', o.project_duration_months) }}
+  </div>
+</div>
+
+<div class="card">
+  <h3>Eligibility</h3>
+  <div class="grid2">
+    {{ txt('eligible_geographies', 'Eligible geographies (JSON)', o.eligible_geographies, span=true) }}
+    {{ txt('requires_unit_in', 'Requires a unit in', o.requires_unit_in) }}
+    {{ txt('max_company_age_years', 'Max company age (years)', o.max_company_age_years) }}
+    {{ txt('eligible_sme_sizes', 'Eligible sizes (JSON)', o.eligible_sme_sizes) }}
+    {{ txt('requires_qualification', 'Requires qualification (JSON)', o.requires_qualification) }}
+    {{ yesno('requires_partners', 'Partners required', o.requires_partners) }}
+    {{ txt('partner_requirements', 'Partner requirements', o.partner_requirements) }}
+    {{ txt('trl_min', 'TRL min', o.trl_min) }}
+    {{ txt('trl_max', 'TRL max', o.trl_max) }}
+    {{ txt('sector_tags', 'Sector tags (JSON)', o.sector_tags) }}
+    {{ txt('impact_focus', 'Impact focus (JSON)', o.impact_focus) }}
+    <label class="span2">Other requirements
+      <textarea name="other_requirements" rows="3">{{ o.other_requirements or '' }}</textarea></label>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Investor thesis</h3>
+  <p class="small muted">Only relevant for equity and convertible instruments.</p>
+  <div class="grid2">
+    {{ txt('ticket_min', 'Ticket min', o.ticket_min) }}
+    {{ txt('ticket_max', 'Ticket max', o.ticket_max) }}
+    {{ txt('stage_focus', 'Stage focus', o.stage_focus) }}
+    {{ txt('sector_focus', 'Sector focus', o.sector_focus) }}
+    {{ txt('geo_focus', 'Geography focus', o.geo_focus) }}
+    {{ txt('lead_or_follow', 'Lead or follow', o.lead_or_follow) }}
+  </div>
+</div>
+
+<div class="card">
+  <h3>Tracking</h3>
+  <div class="grid2">
+    <label>Status
+      <select name="status">
+        {% for s in states %}<option value="{{ s }}" {% if (o.status or 'watching') == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select></label>
+    <label>Source
+      <select name="source_id">
+        <option value="">—</option>
+        {% for s in sources %}<option value="{{ s.id }}" {% if o.source_id == s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+      </select></label>
+    <label>Effort
+      <select name="effort">
+        {% for e in ['', 'low', 'medium', 'high', 'needs_consultant'] %}
+          <option value="{{ e }}" {% if o.effort == e %}selected{% endif %}>{{ e or '—' }}</option>{% endfor %}
+      </select></label>
+    {{ txt('priority', 'Priority', o.priority) }}
+    <label>Best-fit product
+      <select name="best_fit_product_id">
+        <option value="">—</option>
+        {% for p in products %}<option value="{{ p.id }}" {% if o.best_fit_product_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+      </select></label>
+  </div>
+</div>
+
+<div class="actions">
+  <button type="submit">Save</button>
+  <a class="btn muted" href="/{{ view }}">Cancel</a>
+</div>
+</form>
+{% endblock %}

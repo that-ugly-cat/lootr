@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% set can_edit = user.role in ('admin', 'editor') %}
+{% block content %}
+<h1>Sources</h1>
+<p class="small muted">
+  Where discovery looks. A source is only useful if its pages are public and indexed:
+  a directory behind a paywall cannot be searched, however rich it is.
+</p>
+
+<table>
+  <thead><tr>
+    <th>Name</th><th>Geography</th><th>Instruments</th><th>Cadence</th><th>Last scan</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for s in sources %}
+    <tr class="{% if not s.enabled %}row-disabled{% endif %}">
+      <td><div class="stack"><strong>{{ s.name }}</strong>
+        {% if s.url %}<span class="sub"><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.url }}</a></span>{% endif %}
+        {% if s.hints %}<span class="sub">{{ s.hints }}</span>{% endif %}</div></td>
+      <td class="sub">{{ s.geo_hint or '—' }}</td>
+      <td class="sub">{{ s.instrument_hint or '—' }}</td>
+      <td class="sub">{{ s.scan_cadence or 'default' }}</td>
+      <td class="sub nowrap">{{ s.last_scanned_at or 'never' }}</td>
+      <td class="actions-inline">
+        {% if can_edit %}
+        <a class="btn small muted" href="/sources/{{ s.id }}/edit">edit</a>
+        <form method="post" action="/sources/{{ s.id }}/toggle">
+          <button class="small muted" type="submit">{{ 'disable' if s.enabled else 'enable' }}</button></form>
+        {% endif %}
+        {% if user.role == 'admin' %}
+        <form method="post" action="/sources/{{ s.id }}/delete" onsubmit="return confirm('Delete this source?');">
+          <button class="small danger" type="submit">×</button></form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted small">No sources configured yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if can_edit %}
+<div class="card">
+  <h3>Add a source</h3>
+  <form method="post" action="/sources/new">
+    <div class="grid2">
+      <label>Name <input name="name" required></label>
+      <label>URL <input name="url"></label>
+      <label>Geography <input name="geo_hint" placeholder="IT · Puglia · EU"></label>
+      <label>Instruments <input name="instrument_hint" placeholder="grant · prize · vc"></label>
+      <label>Cadence
+        <select name="scan_cadence">
+          {% for c in ['', 'weekly', 'monthly', 'quarterly'] %}<option value="{{ c }}">{{ c or 'default' }}</option>{% endfor %}
+        </select></label>
+      <label class="span2">Search hints <textarea name="hints" rows="2"></textarea></label>
+    </div>
+    <div class="actions"><button type="submit">Add</button></div>
+  </form>
+</div>
+{% endif %}
+
+<h2>Scan log</h2>
+<table>
+  <thead><tr><th>Started</th><th>Source</th><th>Outcome</th><th>Detail</th></tr></thead>
+  <tbody>
+  {% for l in scan_log %}
+    <tr>
+      <td class="sub nowrap">{{ l.started_at }}</td>
+      <td>{{ l.source_name or 'all' }}</td>
+      <td><span class="chip {% if l.outcome == 'ok' %}v-pass{% else %}v-fail{% endif %}">{{ l.outcome }}</span></td>
+      <td class="sub">{{ l.detail or '' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4" class="muted small">No scans yet — the discovery engine is not wired up.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
