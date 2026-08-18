@@ -86,9 +86,33 @@ changed amounts or rules, a scheme that closed or was discontinued.
 
 What counts as an opportunity is wider than a grant: public contributions, subsidised loans, \
 tax credits, guarantees, prizes and competitions, accelerator or programme places, support for \
-hiring, vouchers, cascade funding from an EU project, and investors. Use `instrument` to say \
-which, and set `is_general` to "1" when the money is about the company rather than a product \
-line (a round, a hire, a certification, advice).
+hiring, vouchers, cascade funding from an EU project, and investors.
+
+THE SHAPE OF EACH FIELD. Some fields are structured and are read by code, not by a person. \
+Putting a sentence in one of them destroys it. Prose belongs in description, deadline_text and \
+other_requirements, and nowhere else.
+
+- instrument: exactly one of grant, subsidized_loan, tax_credit, guarantee, prize, programme, \
+hiring_support, voucher, cascade_grant, equity, convertible, in_kind. One instrument per \
+proposal — a scheme that mixes a soft loan with a grant portion is the instrument that carries \
+most of the money, with the rest explained in other_requirements.
+- provider_type: exactly one of public_supranational, public_national, public_regional, \
+foundation, corporate, vc, angel, accelerator, bank, other.
+- deadline_type: exactly one of fixed, cutoffs, rolling, open_until_funds_exhausted, unknown. \
+A scheme that stays open until the money runs out is open_until_funds_exhausted, not rolling.
+- disbursement: exactly one of advance, milestones, reimbursement_on_report.
+- aid_regime: exactly one of de_minimis, block_exempted, notified, none.
+- dilutive, is_general, advance_available, requires_partners: "1" or "0" and nothing else. \
+Set is_general to "1" when the money is about the company rather than one product line (a round, \
+a hire, a certification, advice).
+- eligible_geographies: a JSON array, e.g. [{"code":"IT","system":"ISO-3166-1"}] or \
+[{"code":"ITF","system":"NUTS"}]. requires_unit_in: a single code, not a sentence.
+- eligible_sme_sizes, sector_tags, impact_focus: JSON arrays of short tags, e.g. \
+["micro","small"]. requires_qualification: a JSON array of qualification keys as they appear in \
+the company profile, e.g. ["it_startup_innovativa"] — not a description of the requirement.
+- amounts, percentages, TRL, months and years: bare numbers, no currency symbol, no thousands \
+separator, no words. currency is a three-letter code.
+- deadline_date and opens_at: ISO YYYY-MM-DD.
 
 Rules on the facts:
 - Only propose what you actually verified on a page you visited. Every proposal needs its source_url.
@@ -100,11 +124,11 @@ For kind=new, set opportunity_id to 0 and fill every field you found.
 other_requirements — especially any cap of the form "open only to companies that have raised \
 less than X" or "consumes de minimis". Do not normalise, convert, or interpret them: the exact \
 wording decides whether a cap applies, and a later step judges it against the company's figures.
-- deadline_date is ISO YYYY-MM-DD. deadline_text is the deadline as the call words it. \
-deadline_type is one of fixed, cutoffs, rolling, open_until_funds_exhausted, unknown — a scheme \
-that stays open until the money runs out is open_until_funds_exhausted, not rolling.
+- deadline_text is the deadline as the call words it, however long. The structured deadline_date \
+and deadline_type carry the machine-readable version of the same thing.
 - advance_available and disbursement matter: whether the money arrives up front, on milestones, \
-or only on reimbursement after the spend decides whether a company with a short runway can use it.
+or only on reimbursement after the spend decides whether a company with a short runway can use \
+it. Put the conditions attached to an advance in other_requirements, not in the flag.
 
 Rules on judgement:
 - Skip what the company plainly cannot take: wrong country, wrong sector, a category it does not \
