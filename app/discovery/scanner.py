@@ -19,7 +19,27 @@ import anthropic
 from ..db import OPPORTUNITY_FIELDS, get_db, get_config, opportunities_digest
 from .profile_context import profile_block
 
-MODEL = os.environ.get("LOOTR_MODEL", "claude-opus-5")
+DEFAULT_MODEL = "claude-opus-5"
+
+
+def model() -> str:
+    """The model scanner, verifier and evaluator run on.
+
+    Read at call time rather than at import, because it is a `config` row and
+    the admin page has to be able to change it — as a module constant the row
+    was editable and inert, which is worse than not offering it at all. The
+    environment variable still wins, for trying a model locally without
+    touching the deployed configuration.
+
+    Both fallbacks are `or` rather than a default argument on purpose: an empty
+    config row must read as "not set" and fall through, or clearing the box in
+    the admin page would send an empty model string to the API.
+    """
+    return (os.environ.get("LOOTR_MODEL")
+            or get_config("scan_model")
+            or DEFAULT_MODEL)
+
+
 MAX_TURNS = 8
 MAX_WEB_SEARCHES = 14
 CADENCE_DAYS = {"weekly": 7, "monthly": 30, "quarterly": 90}
@@ -216,7 +236,7 @@ def scan_source(source: dict) -> dict:
 
     for _ in range(MAX_TURNS):
         response = client.messages.create(
-            model=MODEL,
+            model=model(),
             max_tokens=16000,
             output_config={"effort": "high"},
             system=SYSTEM,

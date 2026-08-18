@@ -11,7 +11,7 @@ import anthropic
 
 from ..db import OPPORTUNITY_FIELDS, get_db
 from .profile_context import opportunity_block
-from .scanner import MODEL
+from .scanner import model
 
 MAX_TURNS = 6
 
@@ -119,7 +119,7 @@ def verify_opportunity(opportunity_id: int) -> dict:
     try:
         for _ in range(MAX_TURNS):
             response = client.messages.create(
-                model=MODEL, max_tokens=12000, output_config={"effort": "high"},
+                model=model(), max_tokens=12000, output_config={"effort": "high"},
                 system=SYSTEM, tools=TOOLS, messages=messages,
             )
             if response.stop_reason == "refusal":

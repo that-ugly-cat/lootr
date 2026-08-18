@@ -714,7 +714,33 @@ with TestClient(app) as c:
     check("where a unit is required suggests the codes in use",
           'list="dl-o-requires_unit_in"' in r.text and '<option value="IT">' in r.text)
 
+    print("\n== configuration is live, not decorative ==")
+    from app.discovery.scanner import model as scan_model
+    r = c.get("/admin")
+    check("the model is an open suggestion list, not a closed one",
+          'list="dl-cfg-scan_model"' in r.text
+          and '<select name="value">' not in r.text.split('scan_model')[1][:400])
+    check("the cadence fallback is a closed select",
+          'dl-cfg-default_scan_cadence' not in r.text and '>quarterly<' in r.text)
+    check("the nightly cap is a number input",
+          'type="number" step="1" name="value"' in r.text)
+    # The row existed and was editable before this: it just wasn't read by
+    # anything, which is worse than not offering it.
+    c.post("/admin/config/scan_model", data={"value": "claude-sonnet-5"})
+    check("changing the model in admin changes the model the engine uses",
+          scan_model() == "claude-sonnet-5", scan_model())
+    c.post("/admin/config/scan_model", data={"value": ""})
+    check("an empty model falls back to the default rather than to nothing",
+          scan_model() == "claude-opus-5", scan_model())
+
+    check("the header shows the company", "BeadRoots" in c.get("/calls").text)
+    c.post("/admin/config/company_display_name", data={"value": "BeadRoots (dev)"})
+    check("the display name overrides the legal name",
+          "BeadRoots (dev)" in c.get("/calls").text)
+    c.post("/admin/config/company_display_name", data={"value": ""})
+
     print("\n== multi-value fields ==")
+    r = c.get("/opportunities/new")
     # A datalist cannot serve a list: it completes the whole box. These are
     # multi-selects over a vocabulary, with a way to add to it.
     check("sizes are a multi-select over the closed set",

@@ -21,6 +21,10 @@ header {
 .brand { font-size: 1.25rem; font-weight: 900; letter-spacing: -0.02em; }
 .brand a { color: var(--fg); text-decoration: none; }
 .brand span { color: var(--accent); }
+.brand-company {
+  font-size: 0.82rem; font-weight: 600; color: var(--fg);
+  padding-left: 0.7rem; border-left: 1px solid var(--border);
+}
 .tagline-top { font-size: 0.82rem; color: var(--muted); }
 nav { margin-left: auto; display: flex; gap: 1.1rem; font-size: 0.82rem; font-weight: 600; align-items: baseline; }
 nav a { color: var(--accent-dim); text-decoration: none; }

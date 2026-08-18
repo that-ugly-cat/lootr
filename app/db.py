@@ -420,7 +420,8 @@ CREATE INDEX IF NOT EXISTS idx_prop_status    ON proposals(status);
 # editable from the admin UI and must never be hardcoded elsewhere.
 CONFIG_DEFAULTS = [
     ("base_currency", "EUR", "Reporting currency for aggregates"),
-    ("company_display_name", "", "Shown in the UI header"),
+    ("company_display_name", "", "Shown in the UI header; empty falls back to "
+                                 "the company legal name"),
     ("scan_model", "claude-opus-5", "Model used by scanner and evaluator"),
     ("default_scan_cadence", "monthly", "Fallback when a source has none"),
     ("max_scans_per_run", "6", "Sources the nightly scan will touch at most, "
@@ -493,6 +494,11 @@ def init_db() -> None:
                 "INSERT OR IGNORE INTO config (key, value, note) VALUES (?,?,?)",
                 (key, value, note),
             )
+            # The note is documentation, not data: nobody edits it in the UI, so
+            # refreshing it on every boot keeps an existing deployment's
+            # explanations in step with the code rather than frozen at whatever
+            # they said the day the row was created.
+            db.execute("UPDATE config SET note=? WHERE key=?", (note, key))
         for key, label, ceiling, currency, window, note in COUNTER_DEFAULTS:
             db.execute(
                 "INSERT OR IGNORE INTO funding_counters "

@@ -13,8 +13,8 @@ from markupsafe import Markup
 from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
                     new_api_key, require_admin, require_editor, require_user,
                     verify_password)
-from ..db import (CONDITION_TIMING, OPPORTUNITY_FIELDS, company_profile, get_db,
-                  json_field, status_condition)
+from ..db import (CONDITION_TIMING, OPPORTUNITY_FIELDS, company_profile,
+                  get_config, get_db, json_field, status_condition)
 from ..discovery.evaluator import evaluate_opportunity, run_evaluations, stale_evaluations
 from ..discovery.link_monitor import run_link_monitor
 from ..discovery.scanner import run_scan
@@ -127,6 +127,20 @@ TAG_FIELDS = {
 # company actually holds.
 CLOSED_TAG_FIELDS = {"eligible_sme_sizes", "requires_qualification"}
 MULTI_FIELDS = set(TAG_FIELDS) | CLOSED_TAG_FIELDS
+
+# The config rows, offered as their value sets deserve. Anything not listed is a
+# plain text box.
+CONFIG_CHOICES = {
+    # Deliberately a datalist and not a select: new models ship regularly, and
+    # nothing in the code branches on the value — it is handed to the API as
+    # written. A closed list would age into a cage.
+    "scan_model": ("datalist", ["claude-opus-5", "claude-sonnet-5",
+                                "claude-haiku-4-5", "claude-fable-5"]),
+    # Closed, and read by code: CADENCE_DAYS knows exactly these three.
+    "default_scan_cadence": ("select", ["weekly", "monthly", "quarterly"]),
+    "max_scans_per_run": ("number", []),
+    "base_currency": ("datalist", CURRENCIES),
+}
 
 # How each field is offered in the forms.
 #   select   — a closed set the code branches on. Typing something else would
@@ -289,8 +303,12 @@ def _render(request: Request, name: str, **ctx) -> HTMLResponse:
     with get_db() as db:
         ctx.setdefault("pending_count", db.execute(
             "SELECT COUNT(*) AS n FROM proposals WHERE status='pending'").fetchone()["n"])
-        ctx.setdefault("company_name", db.execute(
-            "SELECT legal_name FROM company WHERE id=1").fetchone()["legal_name"] or "")
+        # The display name is what the header shows; the legal name is the
+        # fallback, so a fresh instance is never nameless and nobody has to fill
+        # in a config row to get a sensible header.
+        legal = db.execute(
+            "SELECT legal_name FROM company WHERE id=1").fetchone()["legal_name"] or ""
+    ctx.setdefault("company_name", get_config("company_display_name") or legal)
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -1098,6 +1116,7 @@ def admin_page(request: Request, user=Depends(require_admin)):
         keys = [dict(r) for r in db.execute("SELECT * FROM api_keys ORDER BY created_at DESC")]
         cfg = [dict(r) for r in db.execute("SELECT * FROM config ORDER BY key")]
     return _render(request, "admin.html", users=users, api_keys=keys, config=cfg,
+                   config_choices=CONFIG_CHOICES,
                    new_key=request.query_params.get("new_key"))
 
 

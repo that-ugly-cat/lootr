@@ -10,6 +10,11 @@
 <body>
 <header>
   <div class="brand"><a href="/">Loot<span>r</span></a></div>
+  {%- if user and company_name %}
+  {# One instance, one company: saying whose money this is costs nothing and
+     removes any doubt about which deployment you are looking at. #}
+  <span class="brand-company">{{ company_name }}</span>
+  {%- endif %}
   <span class="tagline-top">every way to fund the company, on one table that watches by itself</span>
   <nav>
     {% if user %}

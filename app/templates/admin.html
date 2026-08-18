@@ -99,7 +99,21 @@
       <td><code>{{ c.key }}</code></td>
       <td>
         <form method="post" action="/admin/config/{{ c.key }}" class="inline-form">
-          <input name="value" value="{{ c.value or '' }}" size="24">
+          {%- set spec = config_choices.get(c.key) %}
+          {%- set kind = spec[0] if spec else 'text' %}
+          {%- if kind == 'select' %}
+            <select name="value">
+              {% for opt in spec[1] %}<option value="{{ opt }}" {% if c.value == opt %}selected{% endif %}>{{ opt }}</option>{% endfor %}
+            </select>
+          {%- elif kind == 'datalist' %}
+            <input name="value" value="{{ c.value or '' }}" size="24"
+                   list="dl-cfg-{{ c.key }}" autocomplete="off">
+            <datalist id="dl-cfg-{{ c.key }}">{% for opt in spec[1] %}<option value="{{ opt }}">{% endfor %}</datalist>
+          {%- elif kind == 'number' %}
+            <input type="number" step="1" name="value" value="{{ c.value or '' }}" size="24">
+          {%- else %}
+            <input name="value" value="{{ c.value or '' }}" size="24">
+          {%- endif %}
           <button class="small muted" type="submit">save</button>
         </form>
       </td>
