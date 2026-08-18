@@ -55,6 +55,7 @@ app/
   version.py       commit hash shown in the footer
   auth.py          JWT cookie auth, three roles, API keys
   proposals.py     diff and approval logic
+  help.py          the text behind every `?`
   mcp_server.py    Ono layer: 14 tools over the whole model
   routers/
     ui.py            web UI
@@ -65,10 +66,35 @@ app/
     scanner.py          per-source semantic scan, per-source cadence
     verifier.py         does the record still match the page
     evaluator.py        eligibility, caps and fit per product line
+  templates/
+    _fields.html     one macro that renders a field with the right widget
 scripts/
-  seed_demo.py     invented data, for looking at the UI
-  smoke_test.py    end-to-end check of everything above
+  seed_beadroots.py  the real profile, from confirmed facts
+  seed_demo.py       invented data, for looking at the UI
+  smoke_test.py      end-to-end check of everything above
 ```
+
+## Interface conventions
+
+**Every `?` is a modal.** The text lives in one place (`help.py`), is served from
+`/help/{key}`, and is reachable from templates as a Jinja global rather than a
+macro so it also works inside other macros. An unknown key renders nothing.
+The entries carry the things that are obvious only after thirty applications —
+de minimis and its rolling window, gross grant equivalent, why a cap's perimeter
+is quoted verbatim, how the money actually arrives, eligibility versus fit — and
+each of the eight narrative sections has one saying what to write in it.
+
+**Widgets follow one rule.** A closed set the code branches on gets a `select`;
+an open set with common values gets an input plus a `datalist`, so you pick or
+you type. The case that motivates it: the derived gate compares
+`highest_degree == "phd"`, so a free-text "PhD" would silently drop out of the
+doctorate count. One place decides (`CHILD_CHOICES`), one macro renders
+(`_fields.html`), and the same macro serves both the edit modal and the add form.
+
+**Verbatim text is kept but is not column material.** A call's own deadline
+wording can run to a paragraph. The table cell shows a short label — the date if
+there is one, else the type in readable words, else a clipped quotation — and the
+full wording stays in the tooltip and the modal.
 
 ## The three discovery processes
 
