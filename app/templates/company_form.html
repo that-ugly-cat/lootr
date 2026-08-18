@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Company core data</h1>
+<h1>Company core data {{ help('profile') }}</h1>
 <p class="small muted">
   Only fields that are a hard eligibility filter, an ingredient of the scan prompt,
   or an input to the fit score. Everything else belongs in the narrative sections.

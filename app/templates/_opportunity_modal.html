@@ -14,15 +14,15 @@
 
     <table class="detail">
       {% if o.amount_min or o.amount_max or o.funding_rate_pct %}
-      <tr><th>Money</th><td>
+      <tr><th>Money {{ help('funding_rate') }}</th><td>
         {% if o.amount_min or o.amount_max %}{{ o.amount_min|money }}–{{ o.amount_max|money }} {{ o.currency or '' }}{% endif %}
         {% if o.funding_rate_pct %} · covers {{ o.funding_rate_pct|pct }}{% endif %}
         {% if o.cofinancing_pct %} · co-financing {{ o.cofinancing_pct|pct }}{% endif %}
-        {% if o.disbursement %}<br>paid: {{ o.disbursement }}{% if o.advance_available %} (advance available){% endif %}{% endif %}
-        {% if o.aid_regime %}<br>aid regime: {{ o.aid_regime }}{% endif %}
+        {% if o.disbursement %}<br>paid: {{ o.disbursement }} {{ help('disbursement') }}{% if o.advance_available %} (advance available){% endif %}{% endif %}
+        {% if o.aid_regime %}<br>aid regime: {{ o.aid_regime }} {{ help('aid_regime') }}{% endif %}
       </td></tr>
       {% endif %}
-      <tr><th>Deadline</th><td>
+      <tr><th>Deadline {{ help('deadline_type') }}</th><td>
         {{ o.deadline_date or o.deadline_text or '—' }}
         {% if o.deadline_type %} <span class="chip">{{ o.deadline_type }}</span>{% endif %}
         {% if o.recurrence_logic %}<br>{{ o.recurrence_logic }}{% endif %}
@@ -37,7 +37,7 @@
         {% if o.lead_or_follow %} · {{ o.lead_or_follow }}{% endif %}
       </td></tr>
       {% endif %}
-      <tr><th>Eligibility</th><td>
+      <tr><th>Eligibility {{ help('eligibility') }}</th><td>
         {% if o.eligibility_verdict %}
           <span class="chip v-{{ o.eligibility_verdict }}">{{ o.eligibility_verdict }}</span>
           {% if o.eligibility_rationale %}<br>{{ o.eligibility_rationale }}{% endif %}
@@ -49,20 +49,20 @@
         {% if o.other_requirements %}<br>{{ o.other_requirements }}{% endif %}
       </td></tr>
       {% if caps %}
-      <tr><th>Caps</th><td>
+      <tr><th>Caps {{ help('opportunity_caps') }}</th><td>
         {% for c in caps %}
           <div>
             <span class="chip {% if c.verdict %}v-{{ c.verdict }}{% endif %}">{{ c.verdict or 'unchecked' }}</span>
             {{ c.counter_label or c.counter_key }}
             {% if c.max_amount %}— {{ c.comparator or 'lt' }} {{ c.max_amount|money }} {{ c.currency or '' }}{% endif %}
             {% if c.ceiling %}<span class="sub"> (ceiling {{ c.ceiling|money }}, used {{ c.used_amount|money(blank='0') }})</span>{% endif %}
-            {% if c.scope_note %}<br><span class="sub">“{{ c.scope_note }}”</span>{% endif %}
+            {% if c.scope_note %}<br><span class="sub">“{{ c.scope_note }}” {{ help('scope_note') }}</span>{% endif %}
           </div>
         {% endfor %}
       </td></tr>
       {% endif %}
       {% if fits %}
-      <tr><th>Product fit</th><td>
+      <tr><th>Product fit {{ help('product_fit') }}</th><td>
         {% for f in fits %}
           <div>
             <span class="chip v-{{ f.verdict }}">{{ f.verdict }}</span>
@@ -74,13 +74,13 @@
       </td></tr>
       {% endif %}
       {% if o.effort or o.priority %}
-      <tr><th>Triage</th><td>
+      <tr><th>Triage {{ help('effort') }}</th><td>
         {% if o.effort %}effort: {{ o.effort }}{% endif %}
         {% if o.priority %} · priority: {{ o.priority }}{% endif %}
       </td></tr>
       {% endif %}
       {% if applications %}
-      <tr><th>Applications</th><td>
+      <tr><th>Applications {{ help('applications') }}</th><td>
         {% for a in applications %}
           <div>{{ a.status }}{% if a.product_name %} · {{ a.product_name }}{% endif %}
           {% if a.amount_requested %} · asked {{ a.amount_requested|money }}{% endif %}
@@ -93,12 +93,12 @@
         {% for c in contacts %}
           <div>{{ c.name }}{% if c.role %}, {{ c.role }}{% endif %}
           {% if c.relationship %}<span class="chip">{{ c.relationship }}</span>{% endif %}
-          {% if c.warm_intro_via %}<br><span class="sub">intro via {{ c.warm_intro_via }}</span>{% endif %}</div>
+          {% if c.warm_intro_via %}<br><span class="sub">intro via {{ c.warm_intro_via }} {{ help('warm_intro') }}</span>{% endif %}</div>
         {% endfor %}
       </td></tr>
       {% endif %}
       {% if activities %}
-      <tr><th>Diary</th><td>
+      <tr><th>Diary {{ help('activities') }}</th><td>
         {% for a in activities %}
           <div><span class="sub">{{ a.happened_at }}</span> · {{ a.kind }}{% if a.contact_name %} with {{ a.contact_name }}{% endif %}<br>{{ a.summary }}</div>
         {% endfor %}

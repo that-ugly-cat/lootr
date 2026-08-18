@@ -3,7 +3,7 @@
 {% block content %}
 
 <div class="section-head">
-  <h1>{{ p.company.legal_name or 'Company profile' }}</h1>
+  <h1>{{ p.company.legal_name or 'Company profile' }} {{ help('profile') }}</h1>
   {% if can_edit %}<a class="btn small" href="/profile/edit">Edit core data</a>{% endif %}
 </div>
 <p class="small muted">
@@ -17,7 +17,7 @@
     {% if p.company.vat_number %} · VAT {{ p.company.vat_number }}{% endif %}
     {% if p.company.industry_codes %}<br>{{ p.company.industry_codes }}{% endif %}
   </td></tr>
-  <tr><th>Age</th><td>
+  <tr><th>Age {{ help('derived') }}</th><td>
     {% if p.company.incorporation_date %}
       incorporated {{ p.company.incorporation_date }} — <strong>{{ p.age_years }} years old</strong>
       <span class="sub">(derived, never stored)</span>
@@ -35,7 +35,7 @@
     {% if p.company.runway_months %} · runway {{ p.company.runway_months }} months{% endif %}
     {% if p.max_active_trl is not none %}<br>highest active TRL: {{ p.max_active_trl }} <span class="sub">(from products)</span>{% endif %}
   </td></tr>
-  <tr><th>Team gates</th><td class="sub">
+  <tr><th>Team gates {{ help('team_gates') }}</th><td class="sub">
     {{ p.team_derived.headcount_active }} active ·
     female founder: {{ 'yes' if p.team_derived.has_female_founder else 'no' }} ·
     doctorate holders: {{ p.team_derived.doctorate_holders }}
@@ -44,11 +44,11 @@
   <tr><th>Impact</th><td>{{ p.company.impact_tags or '—' }}</td></tr>
 </table>
 
-<h2>Cumulative caps</h2>
+<h2>Cumulative caps {{ help('counters') }}</h2>
 <div class="counters">
   {% for c in p.counters %}
   <div class="counter">
-    <div class="k">{{ c.label }}</div>
+    <div class="k">{{ c.label }} {{ help(c.key) }}</div>
     <div class="v">
       {% if c.ceiling %}{{ c.headroom|money }}<span class="sub"> left of {{ c.ceiling|money }}</span>
       {% else %}{{ c.used_amount|money(blank='0') }} <span class="sub">{{ c.currency }}</span>{% endif %}
@@ -74,13 +74,13 @@
   {% endfor %}
 </div>
 
-{% macro child(slug, title, rows, cols, form_fields, hint='') %}
+{% macro child(slug, title, rows, cols, form_fields, hint='', hkey='') %}
 <details class="section">
-  <summary>{{ title }} ({{ rows|length }})</summary>
+  <summary>{{ title }} ({{ rows|length }}) {{ help(hkey) }}</summary>
   <div class="body">
     {% if hint %}<p class="small muted">{{ hint }}</p>{% endif %}
     <table>
-      <thead><tr>{% for label, key in cols %}<th>{{ label }}</th>{% endfor %}{% if can_edit %}<th></th>{% endif %}</tr></thead>
+      <thead><tr>{% for label, key in cols %}<th>{{ label|safe }}</th>{% endfor %}{% if can_edit %}<th></th>{% endif %}</tr></thead>
       <tbody>
       {% for r in rows %}
         <tr>{% for label, key in cols %}<td>{{ r[key] if r[key] is not none else '—' }}</td>{% endfor %}
@@ -108,29 +108,34 @@
 {{ child('locations', 'Locations', p.all_locations,
    [('Kind','kind'),('City','city'),('Region','region'),('Code','region_code'),('System','code_system'),('Registered','registered')],
    [('kind','kind'),('city','city'),('country','country'),('region','region'),('region_code','region code'),('code_system','NUTS'),('registered','1')],
-   'Regional eligibility is decided here: many schemes want a formally registered operating unit inside the region.') }}
+   'Regional eligibility is decided here: many schemes want a formally registered operating unit inside the region.',
+   hkey='locations') }}
 
 {{ child('qualifications', 'Qualifications', p.all_qualifications,
    [('Key','key'),('Label','label'),('Jurisdiction','jurisdiction'),('Status','status'),('Valid until','valid_until'),('Confirmed','confirmed_at')],
    [('key','key'),('label','label'),('jurisdiction','IT'),('status','active'),('valid_until','valid until'),('confirmed_at','confirmed on'),('renewal_every_months','12')],
-   'Legal statuses, certifications and labels with a validity window. Also the home for things that are themselves keys to other funding.') }}
+   'Legal statuses, certifications and labels with a validity window. Also the home for things that are themselves keys to other funding.',
+   hkey='qualifications') }}
 
 {{ child('team', 'Team', p.all_team,
    [('Name','name'),('Role','role'),('Founder','is_founder'),('Degree','highest_degree'),('Joined','joined_at'),('Left','left_at')],
    [('name','name'),('role','role'),('is_founder','1'),('gender','f/m'),('birth_year','1990'),('residence_region','region'),('highest_degree','phd'),('joined_at','joined'),('left_at','left')],
-   'Departures keep their row with a leaving date: the track record was built with them.') }}
+   'Departures keep their row with a leaving date: the track record was built with them.',
+   hkey='team_gates') }}
 
 {{ child('funding', 'Funding history', p.all_funding,
    [('Instrument','instrument'),('Amount','amount'),('Investor','investor'),('Closed','closed_at'),('Converted','converted')],
    [('instrument','instrument'),('amount','amount'),('currency','EUR'),('investor','investor'),('closed_at','closed on'),('converted','1/0')],
-   'Whether a convertible has converted decides how it counts against equity-raised caps.') }}
+   'Whether a convertible has converted decides how it counts against equity-raised caps.',
+   hkey='funding_history') }}
 
 {{ child('aid', 'Public aid ledger', p.all_aid,
-   [('Name','name'),('Provider','provider'),('Regime','regime'),('Nominal','nominal_amount'),('GGE','gge_amount'),('Granted','granted_at')],
+   [('Name','name'),('Provider','provider'),('Regime','regime'),('Nominal','nominal_amount'),('GGE ' ~ help('gge'),'gge_amount'),('Granted','granted_at')],
    [('name','name'),('provider','provider'),('regime','de_minimis'),('nominal_amount','nominal'),('gge_amount','GGE'),('currency','EUR'),('granted_at','granted on')],
-   'What counts against a ceiling is the gross grant equivalent, on the date of the award decision.') }}
+   'What counts against a ceiling is the gross grant equivalent, on the date of the award decision.',
+   hkey='aid_ledger') }}
 
-<h2>Narrative</h2>
+<h2>Narrative {{ help('narrative') }}</h2>
 <p class="small muted">Markdown, injected verbatim into the scan and evaluation prompts.</p>
 {% for section, content in p.narrative.items() %}
 <details class="section">

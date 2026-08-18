@@ -12,17 +12,17 @@
         <option value="">—</option>
         {% for s in states %}<option value="{{ s }}" {% if p.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
       </select></label>
-    <label>TRL <input name="trl" value="{{ p.trl if p.trl is not none else '' }}"></label>
+    <label>TRL {{ help('trl') }} <input name="trl" value="{{ p.trl if p.trl is not none else '' }}"></label>
     <label>TRL updated <input type="date" name="trl_updated_at" value="{{ p.trl_updated_at or '' }}"></label>
-    <label>IP status
+    <label>IP status {{ help('ip') }}
       <select name="ip_status">
         {% for s in ['', 'none', 'filed', 'pct', 'granted'] %}
           <option value="{{ s }}" {% if p.ip_status == s %}selected{% endif %}>{{ s or '—' }}</option>{% endfor %}
       </select></label>
-    <label class="span2">TRL evidence
+    <label class="span2">TRL evidence {{ help('trl_evidence') }}
       <textarea name="trl_evidence" rows="3" placeholder="What justifies that number. Reused across applications.">{{ p.trl_evidence or '' }}</textarea></label>
     <label class="span2">IP references <input name="ip_refs" value="{{ p.ip_refs or '' }}"></label>
-    <label>Regulatory framework
+    <label>Regulatory framework {{ help('regulatory') }}
       <input name="regulatory_framework" value="{{ p.regulatory_framework or '' }}"
              placeholder="which regime applies"></label>
     <label>Regulatory status

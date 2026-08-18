@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% set can_edit = user.role in ('admin', 'editor') %}
 {% block content %}
-<h1>Pipeline</h1>
+<h1>Pipeline {{ help('applications') }}</h1>
 <p class="small muted">
   Applications being prepared or filed, and the diary. Sorted by next action:
   the investor branch has no deadline, only a next step.
@@ -62,7 +62,7 @@
 
 {% if can_edit %}
 <div class="card">
-  <h3>Add an application</h3>
+  <h3>Add an application {{ help('applications') }}</h3>
   <form method="post" action="/pipeline/new">
     <div class="grid2">
       <label class="span2">Opportunity
@@ -108,7 +108,7 @@
 </div>
 {% endif %}
 
-<h2>Recent activity</h2>
+<h2>Recent activity {{ help('activities') }}</h2>
 <table>
   <thead><tr><th>Date</th><th>Kind</th><th>Opportunity</th><th>Summary</th></tr></thead>
   <tbody>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% set can_edit = user.role in ('admin', 'editor') %}
 {% block content %}
-<h1>Sources</h1>
+<h1>Sources {{ help('sources') }}</h1>
 <p class="small muted">
   Where discovery looks. A source is only useful if its pages are public and indexed:
   a directory behind a paywall cannot be searched, however rich it is.
@@ -9,7 +9,7 @@
 
 <table>
   <thead><tr>
-    <th>Name</th><th>Geography</th><th>Instruments</th><th>Cadence</th><th>Last scan</th><th></th>
+    <th>Name</th><th>Geography</th><th>Instruments</th><th>Cadence {{ help('scan_cadence') }}</th><th>Last scan</th><th></th>
   </tr></thead>
   <tbody>
   {% for s in sources %}
@@ -48,7 +48,7 @@
       <label>URL <input name="url"></label>
       <label>Geography <input name="geo_hint" placeholder="IT · Puglia · EU"></label>
       <label>Instruments <input name="instrument_hint" placeholder="grant · prize · vc"></label>
-      <label>Cadence
+      <label>Cadence {{ help('scan_cadence') }}
         <select name="scan_cadence">
           {% for c in ['', 'weekly', 'monthly', 'quarterly'] %}<option value="{{ c }}">{{ c or 'default' }}</option>{% endfor %}
         </select></label>

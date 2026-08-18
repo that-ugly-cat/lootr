@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="section-head">
-  <h1>Product lines</h1>
+  <h1>Product lines {{ help('products') }}</h1>
   {% if user.role in ('admin', 'editor') %}<a class="btn small" href="/products/new">+ add</a>{% endif %}
 </div>
 <p class="small muted">
@@ -11,7 +11,7 @@
 
 <table>
   <thead><tr>
-    <th>Name</th><th>Status</th><th>TRL</th><th>IP</th><th>Regulatory</th><th>Segments</th><th></th>
+    <th>Name</th><th>Status</th><th>TRL {{ help('trl') }}</th><th>IP {{ help('ip') }}</th><th>Regulatory {{ help('regulatory') }}</th><th>Segments</th><th></th>
   </tr></thead>
   <tbody>
   {% for p in products %}

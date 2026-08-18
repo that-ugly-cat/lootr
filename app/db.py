@@ -517,14 +517,27 @@ def company_profile() -> dict:
         }
         counters = _rows(db, "SELECT * FROM funding_counters WHERE active=1")
 
-        aid_sum = db.execute(
-            "SELECT COALESCE(SUM(gge_amount),0) AS s FROM company_aid "
-            "WHERE regime='de_minimis' "
-            "AND granted_at IS NOT NULL AND date(granted_at) >= date('now','-3 years')"
-        ).fetchone()["s"]
-        funding_sum = db.execute(
-            "SELECT COALESCE(SUM(amount),0) AS s FROM company_funding"
-        ).fetchone()["s"]
+        # Ledger cross-checks. Each counter is maintained by hand; these are what
+        # the two ledgers say, shown beside it so a stale figure becomes visible.
+        def total(sql: str) -> float:
+            return db.execute(sql).fetchone()["s"] or 0
+
+        cross = {
+            "de_minimis": total(
+                "SELECT SUM(gge_amount) AS s FROM company_aid WHERE regime='de_minimis' "
+                "AND granted_at IS NOT NULL AND date(granted_at) >= date('now','-3 years')"),
+            "lifetime_total_raised": (
+                total("SELECT SUM(amount) AS s FROM company_funding")
+                + total("SELECT SUM(nominal_amount) AS s FROM company_aid")),
+            # An unconverted convertible is not equity yet, and several calls
+            # draw the line exactly there.
+            "lifetime_equity_raised": total(
+                "SELECT SUM(amount) AS s FROM company_funding WHERE instrument='equity' "
+                "OR (instrument='convertible' AND converted=1)"),
+            "lifetime_public_grants": total(
+                "SELECT SUM(nominal_amount) AS s FROM company_aid WHERE regime IN "
+                "('de_minimis','de_minimis_agri','block_exempted','notified')"),
+        }
 
     age_years = None
     if company.get("incorporation_date"):
@@ -535,10 +548,8 @@ def company_profile() -> dict:
             ).fetchone()["a"]
 
     for counter in counters:
-        if counter["key"] == "de_minimis":
-            counter["ledger_cross_check"] = aid_sum
-        elif counter["key"] == "lifetime_total_raised":
-            counter["ledger_cross_check"] = funding_sum
+        if counter["key"] in cross:
+            counter["ledger_cross_check"] = cross[counter["key"]]
         if counter["ceiling"] is not None:
             counter["headroom"] = counter["ceiling"] - (counter["used_amount"] or 0)
 

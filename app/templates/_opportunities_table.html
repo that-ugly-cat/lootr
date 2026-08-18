@@ -4,11 +4,11 @@
       <th>{% if view == 'investors' %}Investor{% else %}Opportunity{% endif %}</th>
       <th>Instrument</th>
       {% if view == 'investors' %}
-        <th>Ticket</th><th>Stage</th><th>Next action</th>
+        <th>Ticket</th><th>Stage</th><th>Next action {{ help('activities') }}</th>
       {% else %}
-        <th>Amount</th><th>Deadline</th><th>Fit</th>
+        <th>Amount</th><th>Deadline {{ help('deadline_type') }}</th><th>Fit {{ help('fit_score') }}</th>
       {% endif %}
-      <th>Status</th>
+      <th>Status {{ help('status') }}</th>
     </tr>
   </thead>
   <tbody>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="section-head">
-  <h1>Proposals</h1>
+  <h1>Proposals {{ help('proposals_queue') }}</h1>
   <div class="filters">
     {% for s in ['pending', 'approved', 'rejected'] %}
       <a class="btn small muted {% if f_status == s %}active{% endif %}" href="/proposals?status={{ s }}">{{ s }}</a>

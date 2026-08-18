@@ -8,7 +8,7 @@
     <label>URL <input name="url" value="{{ source.url or '' }}"></label>
     <label>Geography <input name="geo_hint" value="{{ source.geo_hint or '' }}"></label>
     <label>Instruments <input name="instrument_hint" value="{{ source.instrument_hint or '' }}"></label>
-    <label>Cadence
+    <label>Cadence {{ help('scan_cadence') }}
       <select name="scan_cadence">
         {% for c in ['', 'weekly', 'monthly', 'quarterly'] %}
           <option value="{{ c }}" {% if source.scan_cadence == c %}selected{% endif %}>{{ c or 'default' }}</option>{% endfor %}

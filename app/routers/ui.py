@@ -7,11 +7,14 @@ from datetime import date
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 
 from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
                     new_api_key, require_admin, require_editor, require_user,
                     verify_password)
 from ..db import OPPORTUNITY_FIELDS, company_profile, get_db, json_field, status_condition
+from ..help import HELP
+from ..help import get as get_help
 from ..proposals import (EQUITY_INSTRUMENTS, EQUITY_PROVIDERS, approve,
                          compute_diff, default_dilutive, reject)
 from ..version import commit_hash
@@ -43,6 +46,19 @@ def _pct(value) -> str:
 
 templates.env.filters["money"] = _money
 templates.env.filters["pct"] = _pct
+
+
+def _help_button(key: str) -> Markup:
+    """The `?` affordance. A Jinja global rather than a macro so it also works
+    inside other macros. An unknown key renders nothing instead of breaking."""
+    if key not in HELP:
+        return Markup("")
+    return Markup(
+        f'<button type="button" class="help" aria-label="What is this?" '
+        f'title="What is this?" hx-get="/help/{key}" hx-target="#modal">?</button>')
+
+
+templates.env.globals["help"] = _help_button
 
 INSTRUMENTS = [
     "grant", "subsidized_loan", "tax_credit", "guarantee", "prize", "programme",
@@ -107,6 +123,16 @@ def _form_values(form, fields: list[str]) -> dict:
 @router.get("/", response_class=HTMLResponse)
 def landing(request: Request):
     return _render(request, "landing.html")
+
+
+@router.get("/help/{key}", response_class=HTMLResponse)
+def help_modal(request: Request, key: str, user=Depends(require_user)):
+    entry = get_help(key)
+    if not entry:
+        return HTMLResponse("")
+    title, body = entry
+    return templates.TemplateResponse(request, "_help_modal.html",
+                                      {"title": title, "body": body})
 
 
 @router.get("/login", response_class=HTMLResponse)

@@ -239,3 +239,21 @@ details.section textarea { min-height: 7rem; resize: vertical; font-size: 0.84re
 .stack .sub { font-size: 0.74rem; color: var(--muted); }
 .nowrap { white-space: nowrap; }
 .right { text-align: right; }
+
+/* help affordance: a `?` that opens the explanation modal */
+.help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; padding: 0; margin-left: 0.35em;
+  background: transparent; border: 1px solid var(--border); border-radius: 50%;
+  color: var(--faint); font-size: 0.62rem; font-weight: 700; line-height: 1;
+  cursor: pointer; vertical-align: middle;
+}
+.help:hover { background: var(--card-hover); border-color: var(--accent-dim); color: var(--accent); }
+th .help { border-color: #23273a; }
+.help-card { max-width: 34rem; }
+.help-body p { font-size: 0.86rem; color: var(--label); line-height: 1.7; margin: 0.7rem 0; }
+.help-body p:first-child { margin-top: 0.3rem; }
+.help-body strong { color: var(--fg); }
+.help-body em { color: var(--warn); font-style: normal; }
+.help-body code { color: var(--accent); }
+.tabs-help { display: flex; align-items: center; }

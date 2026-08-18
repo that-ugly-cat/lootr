@@ -358,5 +358,17 @@ with TestClient(app) as c:
           c.get("/ono/opportunities", headers={"X-API-Key": key}).status_code == 401)
     check("revoked key rejected on MCP", c.post(f"/mcp/k/{key}", json={}, headers=H).status_code == 401)
 
+
+    print("\n== help ==")
+    from app.help import HELP  # noqa: E402
+    broken = [k for k in HELP if "help-body" not in c.get(f"/help/{k}").text]
+    check(f"all {len(HELP)} help entries render", not broken, str(broken))
+    check("unknown help key renders nothing", c.get("/help/nope").text == "")
+    check("help is gated", TestClient(app).get("/help/de_minimis").status_code == 401)
+    thin = [path for path in ["/calls", "/investors", "/profile", "/products",
+                              "/pipeline", "/proposals", "/sources", "/admin",
+                              "/opportunities/new"]
+            if 'class="help"' not in c.get(path).text]
+    check("every page carries help affordances", not thin, str(thin))
 print("\n" + ("ALL GREEN" if not fails else f"{len(fails)} FAILURES: {fails}"))
 sys.exit(1 if fails else 0)

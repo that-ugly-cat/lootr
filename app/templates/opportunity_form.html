@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% macro txt(name, label, value, type='text', span=false) %}
-  <label class="{% if span %}span2{% endif %}">{{ label }}
+  <label class="{% if span %}span2{% endif %}">{{ label|safe }}
     <input type="{{ type }}" name="{{ name }}" value="{{ value if value is not none else '' }}"></label>
 {% endmacro %}
 {% macro yesno(name, label, value) %}
-  <label>{{ label }}
+  <label>{{ label|safe }}
     <select name="{{ name }}">
       <option value="" {% if value is none %}selected{% endif %}>unknown</option>
       <option value="1" {% if value == 1 %}selected{% endif %}>yes</option>
@@ -22,24 +22,24 @@
   <div class="grid2">
     {{ txt('title', 'Title *', o.title, span=true) }}
     {{ txt('provider', 'Provider', o.provider) }}
-    <label>Provider type
+    <label>Provider type {{ help('provider_type') }}
       <select name="provider_type">
         <option value="">—</option>
         {% for p in provider_types %}<option value="{{ p }}" {% if o.provider_type == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
       </select></label>
-    <label>Instrument
+    <label>Instrument {{ help('instrument') }}
       <select name="instrument">
         <option value="">—</option>
         {% for i in instruments %}<option value="{{ i }}" {% if o.instrument == i %}selected{% endif %}>{{ i }}</option>{% endfor %}
       </select></label>
-    {{ yesno('dilutive', 'Dilutive', o.dilutive) }}
+    {{ yesno('dilutive', 'Dilutive ' ~ help('dilutive'), o.dilutive) }}
     {{ txt('link', 'Link', o.link, span=true) }}
     <label class="span2">Description <textarea name="description" rows="3">{{ o.description or '' }}</textarea></label>
   </div>
 </div>
 
 <div class="card">
-  <h3>Money</h3>
+  <h3>Money {{ help('funding_rate') }}</h3>
   <div class="grid2">
     {{ txt('amount_min', 'Amount min', o.amount_min) }}
     {{ txt('amount_max', 'Amount max', o.amount_max) }}
@@ -47,8 +47,8 @@
     {{ txt('funding_rate_pct', 'Funding rate %', o.funding_rate_pct) }}
     {{ txt('cofinancing_pct', 'Co-financing %', o.cofinancing_pct) }}
     {{ yesno('advance_available', 'Advance available', o.advance_available) }}
-    {{ txt('disbursement', 'Disbursement', o.disbursement) }}
-    {{ txt('aid_regime', 'Aid regime', o.aid_regime) }}
+    {{ txt('disbursement', 'Disbursement ' ~ help('disbursement'), o.disbursement) }}
+    {{ txt('aid_regime', 'Aid regime ' ~ help('aid_regime'), o.aid_regime) }}
     {{ txt('call_total_budget', 'Total call budget', o.call_total_budget, span=true) }}
   </div>
 </div>
@@ -56,7 +56,7 @@
 <div class="card">
   <h3>Time</h3>
   <div class="grid2">
-    <label>Deadline type
+    <label>Deadline type {{ help('deadline_type') }}
       <select name="deadline_type">
         {% for d in ['', 'fixed', 'cutoffs', 'rolling', 'open_until_funds_exhausted', 'unknown'] %}
           <option value="{{ d }}" {% if o.deadline_type == d %}selected{% endif %}>{{ d or '—' }}</option>
@@ -73,7 +73,7 @@
 </div>
 
 <div class="card">
-  <h3>Eligibility</h3>
+  <h3>Eligibility {{ help('eligibility') }}</h3>
   <div class="grid2">
     {{ txt('eligible_geographies', 'Eligible geographies (JSON)', o.eligible_geographies, span=true) }}
     {{ txt('requires_unit_in', 'Requires a unit in', o.requires_unit_in) }}
@@ -105,7 +105,7 @@
 </div>
 
 <div class="card">
-  <h3>Tracking</h3>
+  <h3>Tracking {{ help('effort') }}</h3>
   <div class="grid2">
     <label>Status
       <select name="status">

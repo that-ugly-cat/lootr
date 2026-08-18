@@ -1,0 +1,9 @@
+<div class="modal-overlay" onclick="if (event.target === this) document.getElementById('modal').innerHTML = '';">
+  <div class="modal-card help-card">
+    <div class="modal-head">
+      <h2>{{ title }}</h2>
+      <button class="modal-close" onclick="document.getElementById('modal').innerHTML = '';">✕</button>
+    </div>
+    <div class="help-body">{{ body|safe }}</div>
+  </div>
+</div>
