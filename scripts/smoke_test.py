@@ -271,7 +271,8 @@ with TestClient(app) as c:
         db.execute("INSERT INTO proposals (kind, payload, rationale, confidence, method, source_id) "
                    "VALUES ('new', ?, 'Found on the ministry page.', 'high', 'llm_scan', 1)",
                    (json.dumps({"title": "Bando Macchinari Innovativi", "provider": "MIMIT",
-                                "instrument": "grant", "amount_max": 400000}),))
+                                "instrument": "grant", "amount_max": 400000,
+                                "sector_tags": '["manufacturing", "agritech"]'}),))
         db.execute("INSERT INTO proposals (kind, opportunity_id, payload, rationale, confidence, method) "
                    "VALUES ('update', ?, ?, 'Deadline moved.', 'medium', 'llm_check')",
                    (call_id, json.dumps({"deadline_date": "2026-12-31"})))
@@ -295,6 +296,13 @@ with TestClient(app) as c:
     check("origin marked discovery", created["origin"] == "discovery")
     check("source inherited on approval", created["source_id"] == 1)
     check("decided proposals kept", c.get("/proposals?status=approved").text.count("chip kind") == 2)
+    # A tag the engine found has to reach the vocabulary, or it exists on one
+    # record and is offered by no widget — which is how synonyms are born.
+    with get_db() as db:
+        vocab = [r["value"] for r in db.execute(
+            "SELECT value FROM tag_vocabulary WHERE namespace='sector'")]
+    check("tags from an approved proposal join the vocabulary",
+          "manufacturing" in vocab and "agritech" in vocab, str(vocab))
 
     print("\n== roles ==")
     c.post("/admin/users/new", data={"username": "reader", "email": "r@x.it",
@@ -555,6 +563,30 @@ with TestClient(app) as c:
         n = union_count(tool["input_schema"])
         check(f"{name} schema stays under the 16 union-type limit", n <= 16, f"{n} unions")
 
+    print("\n== the prompts know the fields ==")
+    from app.discovery.scanner import FIELD_SHAPE, SYSTEM as SCAN_SYSTEM
+    from app.discovery.verifier import SYSTEM as VERIFY_SYSTEM
+    from app.discovery.profile_context import profile_block
+    # Both processes write the same columns, so both must carry the same rules.
+    # The verifier had none of them: the bug that ate the scanner's columns once
+    # was simply waiting for its turn.
+    for name, prompt in [("scanner", SCAN_SYSTEM), ("verifier", VERIFY_SYSTEM)]:
+        check(f"the {name} prompt carries the field shapes", FIELD_SHAPE in prompt)
+    for field in ["unit_required_by", "eligible_sme_sizes", "requires_qualification",
+                  "sector_tags", "impact_focus", "unit_deadline_months"]:
+        check(f"{field} has its shape spelled out", field in FIELD_SHAPE)
+    check("prose is confined to three fields, by name",
+          all(f in FIELD_SHAPE for f in ["description", "deadline_text", "other_requirements"]))
+
+    with get_db() as db:
+        db.execute("INSERT OR IGNORE INTO tag_vocabulary (namespace, value, label) "
+                   "VALUES ('sector', 'agritech', 'agritech')")
+    block = profile_block()
+    check("the profile block lists the tags already in use",
+          "Tags already in use" in block and "agritech" in block)
+    check("and the qualification keys a call can require",
+          "it_startup_innovativa" in block)
+
     print("\n== discovery: writing results (no API call) ==")
     from app.discovery.evaluator import _write_result, stale_evaluations
     from app.discovery.verifier import _apply_result
@@ -812,9 +844,20 @@ with TestClient(app) as c:
           and 'value="it_startup_innovativa"' in r.text)
     # An empty vocabulary must not render an empty list box: on a fresh instance
     # that reads as a broken widget rather than as a set nobody has filled yet.
+    # Emptied on purpose here — by this point approving a proposal has already
+    # put tags in, which is itself the behaviour two checks above.
+    with get_db() as db:
+        kept = [dict(r) for r in db.execute(
+            "SELECT * FROM tag_vocabulary WHERE namespace='sector'")]
+        db.execute("DELETE FROM tag_vocabulary WHERE namespace='sector'")
+    empty = c.get("/opportunities/new")
     check("an empty vocabulary shows the add box and no empty list",
-          '<select name="sector_tags" multiple' not in r.text
-          and 'name="sector_tags__new"' in r.text)
+          '<select name="sector_tags" multiple' not in empty.text
+          and 'name="sector_tags__new"' in empty.text)
+    with get_db() as db:
+        for row in kept:
+            db.execute("INSERT OR IGNORE INTO tag_vocabulary (namespace, value, label) "
+                       "VALUES (?,?,?)", (row["namespace"], row["value"], row["label"]))
     with get_db() as db:
         for value in ["agrifood", "biotech"]:
             db.execute("INSERT OR IGNORE INTO tag_vocabulary (namespace, value, label) "

@@ -96,25 +96,19 @@ SUBMIT_TOOL = {
 WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search",
                    "max_uses": MAX_WEB_SEARCHES}
 
-SYSTEM = """You are the discovery engine of Lootr, a funding radar for one company. \
-The company profile below is the whole basis for judging relevance: read it before searching.
-
-Given one source and the digest of what is already tracked for it, use web search to find:
-1. NEW opportunities from this source that suit this company and are not in the digest.
-2. UPDATES to tracked opportunities from this source: a new deadline for a recurring call, \
-changed amounts or rules, a scheme that closed or was discontinued.
-
-What counts as an opportunity is wider than a grant: public contributions, subsidised loans, \
-tax credits, guarantees, prizes and competitions, accelerator or programme places, support for \
-hiring, vouchers, cascade funding from an EU project, and investors.
-
-THE SHAPE OF EACH FIELD. Some fields are structured and are read by code, not by a person. \
-Putting a sentence in one of them destroys it. Prose belongs in description, deadline_text and \
-other_requirements, and nowhere else.
+# The shapes live in one constant because two processes write these columns: the
+# scanner and the verifier. The rules were written after a live run in which the
+# model understood everything and destroyed the columns anyway — advance_available
+# holding "Sì: entro 4 mesi dalla firma", a geography holding a sentence. The
+# verifier writes into the same columns and had none of this, which was the same
+# bug waiting for its turn.
+FIELD_SHAPE = """THE SHAPE OF EACH FIELD. Some fields are structured and are read by code, \
+not by a person. Putting a sentence in one of them destroys it. Prose belongs in description, \
+deadline_text and other_requirements, and nowhere else.
 
 - instrument: exactly one of grant, subsidized_loan, tax_credit, guarantee, prize, programme, \
 hiring_support, voucher, cascade_grant, equity, convertible, in_kind. One instrument per \
-proposal — a scheme that mixes a soft loan with a grant portion is the instrument that carries \
+record — a scheme that mixes a soft loan with a grant portion is the instrument that carries \
 most of the money, with the rest explained in other_requirements.
 - provider_type: exactly one of public_supranational, public_national, public_regional, \
 foundation, corporate, vc, angel, accelerator, bank, other.
@@ -131,14 +125,32 @@ a hire, a certification, advice).
 by_project_end, unknown. This one distinction decides whether a geographic requirement excludes \
 a company or merely costs it something: most Italian schemes do not ask for the operating unit \
 to exist when applying, they ask the applicant to undertake to open it, and unit_deadline_months \
-is how many months it then has. Write unknown when the call does not say, and do not assume \
-either way.
-- eligible_sme_sizes, sector_tags, impact_focus: JSON arrays of short tags, e.g. \
-["micro","small"]. requires_qualification: a JSON array of qualification keys as they appear in \
-the company profile, e.g. ["it_startup_innovativa"] — not a description of the requirement.
+is how many months it then has, as a bare number. Write unknown when the call does not say, and \
+do not assume either way.
+- eligible_sme_sizes: a JSON array drawn from micro, small, medium, large.
+- sector_tags and impact_focus: JSON arrays of short snake_case tags. The tags already in use \
+are listed with the company profile: reuse one whenever it fits, and add a new one only when \
+none does. Two tags that mean the same thing are worse than one tag that is slightly wrong, \
+because they never filter together.
+- requires_qualification: a JSON array of qualification keys exactly as they appear in the \
+company profile, e.g. ["it_startup_innovativa"] — not a description of the requirement.
 - amounts, percentages, TRL, months and years: bare numbers, no currency symbol, no thousands \
 separator, no words. currency is a three-letter code.
-- deadline_date and opens_at: ISO YYYY-MM-DD.
+- deadline_date and opens_at: ISO YYYY-MM-DD."""
+
+SYSTEM = """You are the discovery engine of Lootr, a funding radar for one company. \
+The company profile below is the whole basis for judging relevance: read it before searching.
+
+Given one source and the digest of what is already tracked for it, use web search to find:
+1. NEW opportunities from this source that suit this company and are not in the digest.
+2. UPDATES to tracked opportunities from this source: a new deadline for a recurring call, \
+changed amounts or rules, a scheme that closed or was discontinued.
+
+What counts as an opportunity is wider than a grant: public contributions, subsidised loans, \
+tax credits, guarantees, prizes and competitions, accelerator or programme places, support for \
+hiring, vouchers, cascade funding from an EU project, and investors.
+
+""" + FIELD_SHAPE + """
 
 Rules on the facts:
 - Only propose what you actually verified on a page you visited. Every proposal needs its source_url.

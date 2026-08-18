@@ -2,7 +2,8 @@
 Approving is the ONLY path from discovery output to the opportunities table."""
 import json
 
-from .db import OPPORTUNITY_FIELDS, get_db
+from .db import (OPPORTUNITY_FIELDS, TAG_NAMESPACES, get_db, json_field,
+                 remember_tags)
 
 # Instruments that put the opportunity in the Investors view rather than in
 # Calls: no deadline to sort by, a relationship to advance instead.
@@ -56,6 +57,13 @@ def approve(proposal_id: int) -> bool:
             return False
         payload = json.loads(p["payload"] or "{}")
         fields = {k: v for k, v in payload.items() if k in OPPORTUNITY_FIELDS}
+
+        # Tags arriving with an approved proposal join the vocabulary, exactly as
+        # a tag typed into a form does. Otherwise the engine's tags would be
+        # invisible to every widget: present on the record, offered nowhere.
+        for field, namespace in TAG_NAMESPACES.items():
+            if field in fields:
+                remember_tags(db, namespace, json_field(fields[field]))
 
         if p["kind"] == "new":
             if not fields.get("title"):

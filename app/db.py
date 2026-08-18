@@ -472,6 +472,33 @@ CONDITION_TIMING = ["at_application", "at_award", "at_first_payment",
 COMMITMENT_KINDS = ["operating_unit", "hiring", "co_funding", "qualification",
                     "incorporation", "other"]
 
+# Which vocabulary namespace each multi-value field draws on. Here rather than in
+# the UI because there are two writers: a person filling a form, and the approval
+# of a proposal the engine filed.
+TAG_NAMESPACES = {
+    "impact_tags": "impact",        # company and products
+    "target_segments": "segment",   # products
+    "target_markets": "market",
+    "sector_tags": "sector",        # opportunities
+    "impact_focus": "impact",
+}
+
+
+def remember_tags(db, namespace: str, values) -> None:
+    """Add tags to the vocabulary, on the caller's connection.
+
+    Every tag that enters the database this way is offered by the widgets from
+    then on. Without it a tag would exist on one record and nowhere else: not
+    offered, retyped from memory next time, and split into synonyms that never
+    filter together.
+    """
+    for value in values or []:
+        if isinstance(value, str) and value.strip():
+            db.execute(
+                "INSERT OR IGNORE INTO tag_vocabulary (namespace, value, label) "
+                "VALUES (?,?,?)",
+                (namespace, value.strip(), value.strip().replace("_", " ")))
+
 
 @contextmanager
 def get_db():

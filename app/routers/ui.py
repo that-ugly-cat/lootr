@@ -14,8 +14,9 @@ from markupsafe import Markup
 from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
                     new_api_key, require_admin, require_editor, require_user,
                     verify_password)
-from ..db import (CONDITION_TIMING, OPPORTUNITY_FIELDS, company_profile,
-                  get_config, get_db, json_field, status_condition)
+from ..db import (CONDITION_TIMING, OPPORTUNITY_FIELDS, TAG_NAMESPACES,
+                  company_profile, get_config, get_db, json_field,
+                  remember_tags, status_condition)
 from ..discovery.evaluator import evaluate_opportunity, run_evaluations, stale_evaluations
 from ..discovery.link_monitor import run_link_monitor
 from ..discovery.scanner import run_scan
@@ -116,13 +117,9 @@ TRL_LEVELS = [str(n) for n in range(1, 10)]
 # multi-select over a known vocabulary, plus a box for values the vocabulary has
 # never seen. What is typed there is written back to `tag_vocabulary`, so the set
 # stays open and grows by use instead of being retyped from memory every time.
-TAG_FIELDS = {
-    "impact_tags": "impact",        # company and products
-    "target_segments": "segment",   # products
-    "target_markets": "market",
-    "sector_tags": "sector",        # opportunities
-    "impact_focus": "impact",
-}
+# The field-to-namespace mapping lives in db.py: the forms are one writer, the
+# approval of a proposal is the other, and they must agree.
+TAG_FIELDS = TAG_NAMESPACES
 # Closed multi-value sets: the code reads these, so nothing new may be invented
 # in a text box. Sizes are the EU definition; qualification keys are whatever the
 # company actually holds.
@@ -343,10 +340,7 @@ def _remember_tags(namespace: str, values: list[str]) -> None:
     'add' box would be a synonym generator: soil_health today, soil health
     tomorrow, and two tags that mean one thing."""
     with get_db() as db:
-        for value in values:
-            db.execute(
-                "INSERT OR IGNORE INTO tag_vocabulary (namespace, value, label) "
-                "VALUES (?,?,?)", (namespace, value, value.replace("_", " ")))
+        remember_tags(db, namespace, values)
 
 
 def _vocabulary(namespace: str, used=()) -> list[str]:

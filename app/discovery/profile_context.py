@@ -8,7 +8,7 @@ most want it to notice.
 import json
 from datetime import date
 
-from ..db import company_profile, json_field
+from ..db import company_profile, get_db, json_field
 
 
 def _tags(raw) -> str:
@@ -91,6 +91,22 @@ def profile_block(profile: dict | None = None) -> str:
                   if counter["window_years"] else "lifetime")
         out += (f"- {counter['key']}: used {counter['used_amount'] or 0:,.0f} "
                 f"{counter['currency'] or ''}, {ceiling}, {window}\n")
+
+    # The tags already in use, so a scan reuses them instead of coining a
+    # synonym. Two tags meaning one thing never filter together, and nobody
+    # notices until a search comes back half empty.
+    with get_db() as db:
+        vocabulary: dict[str, list[str]] = {}
+        for row in db.execute(
+                "SELECT namespace, value FROM tag_vocabulary "
+                "WHERE COALESCE(active, 1) = 1 ORDER BY namespace, value"):
+            vocabulary.setdefault(row["namespace"], []).append(row["value"])
+    if vocabulary:
+        out += "\n## Tags already in use\n"
+        for namespace, values in vocabulary.items():
+            out += f"- {namespace}: {', '.join(values)}\n"
+        out += ("Reuse one of these whenever it fits; coin a new tag only when "
+                "none does.\n")
 
     narrative = {k: v for k, v in p["narrative"].items() if v}
     if narrative:

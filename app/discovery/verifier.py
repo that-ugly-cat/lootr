@@ -11,7 +11,7 @@ import anthropic
 
 from ..db import OPPORTUNITY_FIELDS, get_db
 from .profile_context import opportunity_block
-from .scanner import model
+from .scanner import FIELD_SHAPE, model
 
 MAX_TURNS = 6
 
@@ -61,9 +61,12 @@ opened, did the deadline pass, have the amounts or the coverage rate changed, is
 still running, do the eligibility conditions still read the way we recorded them. If the link \
 is dead or the page moved, search for the scheme's current official page.
 
+""" + FIELD_SHAPE + """
+
 Rules:
-- Compare against what you actually read; do not guess. deadline_date is ISO YYYY-MM-DD.
-- Report ONLY fields whose stored value is wrong or outdated; leave everything else as an \nempty string. Never write "null" or "unknown" into a field.
+- Compare against what you actually read; do not guess.
+- Report ONLY fields whose stored value is wrong or outdated; leave everything else as an \
+empty string. Never write "null" or "unknown" into a field.
 - A deadline in the past with a known next edition: propose the new deadline.
 - A scheme that was discontinued: say so in other_requirements or description. Do not change \
 status — that is a human decision.
