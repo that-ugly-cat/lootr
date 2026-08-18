@@ -15,15 +15,17 @@ from .scanner import MODEL
 
 MAX_TURNS = 6
 
-_FIELD_PROPS = {f: {"type": ["string", "null"]} for f in OPPORTUNITY_FIELDS}
+# Plain strings, "" for unchanged: a strict schema allows at most 16
+# union-typed parameters and there are far more fields than that.
+_FIELD_PROPS = {f: {"type": "string"} for f in OPPORTUNITY_FIELDS}
 
 SUBMIT_TOOL = {
     "name": "submit_verification",
     "description": (
         "Submit the verification outcome. Call this exactly once, when you have checked "
         "the page. matches=true means every stored field is still accurate; matches=false "
-        "means at least one should change — put ONLY those fields in `fields`, null for "
-        "the rest."
+        "means at least one should change — put ONLY those fields in `fields`, an empty "
+        "string for the rest."
     ),
     "strict": True,
     "input_schema": {
@@ -61,12 +63,12 @@ is dead or the page moved, search for the scheme's current official page.
 
 Rules:
 - Compare against what you actually read; do not guess. deadline_date is ISO YYYY-MM-DD.
-- Report ONLY fields whose stored value is wrong or outdated; leave everything else null.
+- Report ONLY fields whose stored value is wrong or outdated; leave everything else as an \nempty string. Never write "null" or "unknown" into a field.
 - A deadline in the past with a known next edition: propose the new deadline.
 - A scheme that was discontinued: say so in other_requirements or description. Do not change \
 status — that is a human decision.
 - Keep eligibility thresholds in the source's own words. Do not normalise them.
-- If everything checks out, matches=true with every field null.
+- If everything checks out, matches=true with every field empty.
 - Call submit_verification exactly once when done."""
 
 

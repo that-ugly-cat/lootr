@@ -24,10 +24,12 @@ MAX_TURNS = 8
 MAX_WEB_SEARCHES = 14
 CADENCE_DAYS = {"weekly": 7, "monthly": 30, "quarterly": 90}
 
-# Every field arrives as a string or null: SQLite's column affinity converts the
-# numeric and boolean ones on insert, and a flat schema keeps the strict tool
-# small enough to stay reliable.
-_FIELD_PROPS = {f: {"type": ["string", "null"]} for f in OPPORTUNITY_FIELDS}
+# Every field is a plain string, with "" meaning not known / not changed.
+# Nullable would be the natural shape, but a strict schema allows at most 16
+# union-typed parameters and there are far more fields than that, so the empty
+# string carries the absence instead. SQLite's column affinity converts the
+# numeric and boolean ones on insert; _store_proposals drops the empty ones.
+_FIELD_PROPS = {f: {"type": "string"} for f in OPPORTUNITY_FIELDS}
 
 SUBMIT_TOOL = {
     "name": "submit_proposals",
@@ -47,8 +49,8 @@ SUBMIT_TOOL = {
                     "properties": {
                         "kind": {"type": "string", "enum": ["new", "update"]},
                         "opportunity_id": {
-                            "type": ["integer", "null"],
-                            "description": "ID from the digest for kind=update; null for kind=new",
+                            "type": "integer",
+                            "description": "ID from the digest for kind=update; 0 for kind=new",
                         },
                         "fields": {
                             "type": "object",
@@ -90,8 +92,10 @@ line (a round, a hire, a certification, advice).
 
 Rules on the facts:
 - Only propose what you actually verified on a page you visited. Every proposal needs its source_url.
-- For kind=update, set opportunity_id to the digest ID and fill ONLY the fields that changed \
-(null for everything else). For kind=new, fill every field you found, null where unknown.
+- Leave a field as an empty string when you do not know it or it has not changed. Never write \
+"null", "n/a" or "unknown" into a field: an empty string is how absence is recorded.
+- For kind=update, set opportunity_id to the digest ID and fill ONLY the fields that changed. \
+For kind=new, set opportunity_id to 0 and fill every field you found.
 - Record eligibility thresholds and conditions **in the source's own words** in \
 other_requirements — especially any cap of the form "open only to companies that have raised \
 less than X" or "consumes de minimis". Do not normalise, convert, or interpret them: the exact \
@@ -148,7 +152,7 @@ def _store_proposals(source: dict, proposals: list[dict]) -> int:
         for p in proposals:
             fields = {k: v for k, v in (p.get("fields") or {}).items()
                       if k in OPPORTUNITY_FIELDS and v not in (None, "")}
-            kind, oid = p.get("kind"), p.get("opportunity_id")
+            kind, oid = p.get("kind"), p.get("opportunity_id") or None
             if kind not in ("new", "update") or (kind == "update" and not oid):
                 continue
             if kind == "new" and not fields.get("title"):

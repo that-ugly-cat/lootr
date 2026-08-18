@@ -505,6 +505,21 @@ with TestClient(app) as c:
         json.dumps(tool)  # must serialise
         return tool.get("strict") is True and walk(tool["input_schema"])
 
+    def union_count(node):
+        """The API rejects a strict schema with more than 16 union-typed
+        parameters. Caught in production once; caught here from now on."""
+        n = 0
+        if isinstance(node, dict):
+            t = node.get("type")
+            if isinstance(t, list) or "anyOf" in node:
+                n += 1
+            for v in node.values():
+                n += union_count(v)
+        elif isinstance(node, list):
+            for v in node:
+                n += union_count(v)
+        return n
+
     check("scanner tool schema is strict-clean", well_formed(SUBMIT_TOOL))
     check("verifier tool schema is strict-clean", well_formed(VERIFY_TOOL))
     eval_tool = _submit_tool(["de_minimis", "lifetime_equity_raised"], [1, 2])
@@ -515,6 +530,10 @@ with TestClient(app) as c:
     check("evaluator enumerates only real products",
           eval_tool["input_schema"]["properties"]["product_fit"]["items"]["properties"]
           ["product_id"]["enum"] == [1, 2])
+    for name, tool in [("scanner", SUBMIT_TOOL), ("verifier", VERIFY_TOOL),
+                       ("evaluator", eval_tool)]:
+        n = union_count(tool["input_schema"])
+        check(f"{name} schema stays under the 16 union-type limit", n <= 16, f"{n} unions")
 
     print("\n== discovery: writing results (no API call) ==")
     from app.discovery.evaluator import _write_result, stale_evaluations
