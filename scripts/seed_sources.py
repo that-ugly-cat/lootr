@@ -223,16 +223,32 @@ SOURCES = [
     },
     {
         "name": "EU cascade funding (FSTP)",
-        "url": "https://cascadefunding.eu/",
+        # The official portal, not an aggregator. A directory whose value is a
+        # live list is a poor source for a scanner that works by web search: it
+        # finds articles about calls rather than the calls. The portal's own
+        # filter is a page the model can actually interrogate.
+        "url": ("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/"
+                "opportunities/calls-for-proposals"),
         "geo_hint": "EU and Horizon Europe associated countries",
         "instrument_hint": "cascade_grant",
         "scan_cadence": "weekly",
         "hints": (
-            "Open calls issued by funded projects, typically 20k-200k with windows of a "
-            "few weeks, which is why this is scanned weekly. Agrifood and green-digital "
-            "transition projects such as GATE 5.0. The company has already won "
-            "I3-4-SEAWEED, so this channel is proven. Check the cascade counter: some "
-            "calls cap what a single company may receive across all FSTP."
+            "Open calls issued by EU-funded projects to third parties, typically "
+            "20k-200k with windows of a few weeks, which is why this is scanned weekly. "
+            "Start from the Funding & Tenders Portal and its filter under type of grants "
+            "calls, 'Calls for funding in cascade (issued by funded projects)': projects "
+            "register their cascade calls there. Search by named programme rather than by "
+            "category — a query for the concept returns articles about cascade funding, "
+            "a query for a project acronym plus 'open call' returns the call. Names worth "
+            "trying: GATE 5.0, agrifood and bioeconomy Horizon projects running FSTP, "
+            "Digital Innovation Hubs with agri strands, and any project whose name "
+            "appears alongside soil, water or biopolymers. Aggregators such as "
+            "cascadefunding.eu, kaila.eu and eucalls.net are useful as a cross-check "
+            "only: the record must come from the call's own page, with its own deadline. "
+            "The company has already won I3-4-SEAWEED, so this channel is proven. Check "
+            "the cascade counter: some calls cap what one company may receive across all "
+            "FSTP. Mid-summer is genuinely quiet — if everything is closed, say so in "
+            "the search notes rather than stretching to fill the queue."
         ),
     },
     {

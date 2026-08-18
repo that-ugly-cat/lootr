@@ -83,14 +83,24 @@
 
 <h2>Scan log</h2>
 <table>
-  <thead><tr><th>Started</th><th>Source</th><th>Outcome</th><th>Detail</th></tr></thead>
+  <thead><tr><th>Started</th><th>Source</th><th>Outcome</th><th>What happened</th></tr></thead>
   <tbody>
   {% for l in scan_log %}
+    {% set d = l.detail|fromjson({}) %}
     <tr>
       <td class="sub nowrap">{{ l.started_at }}</td>
       <td>{{ l.source_name or 'all' }}</td>
       <td><span class="chip {% if l.outcome == 'ok' %}v-pass{% else %}v-fail{% endif %}">{{ l.outcome }}</span></td>
-      <td class="sub">{{ l.detail or '' }}</td>
+      {# A scan that found nothing has to account for itself: "nothing found" and
+         "nothing looked for" are the same number of proposals. #}
+      <td class="sub">
+        {%- if d.proposed is not none %}
+          {{ d.stored }} proposal{{ '' if d.stored == 1 else 's' }} filed
+          {%- if d.proposed != d.stored %} ({{ d.proposed }} submitted, the rest already pending){% endif %}
+          {% if d.notes %}<br><span class="muted">{{ d.notes }}</span>{% endif %}
+        {%- elif d.detail %}{{ d.detail }}
+        {%- else %}{{ l.detail or '' }}{% endif %}
+      </td>
     </tr>
   {% else %}
     <tr><td colspan="4" class="muted small">No scans yet — the discovery engine is not wired up.</td></tr>

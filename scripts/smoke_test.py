@@ -490,6 +490,7 @@ with TestClient(app) as c:
 
     print("\n== discovery: cadence ==")
     from app.discovery.scanner import SUBMIT_TOOL, due_sources
+    from app.discovery.scanner import SYSTEM as SCAN_SYSTEM
     check("a never-scanned source is due", any(s["id"] == 1 for s in due_sources()))
     with get_db() as db:
         db.execute("UPDATE sources SET last_scanned_at=CURRENT_TIMESTAMP WHERE id=1")
@@ -544,6 +545,12 @@ with TestClient(app) as c:
         return n
 
     check("scanner tool schema is strict-clean", well_formed(SUBMIT_TOOL))
+    # "Nothing found" and "nothing looked for" are the same count of proposals.
+    # The notes are required so an empty scan has to account for itself.
+    check("a scan must say what it searched",
+          "search_notes" in SUBMIT_TOOL["input_schema"]["required"])
+    check("and the prompt asks hardest for it when nothing was found",
+          "fill it hardest when you propose nothing" in SCAN_SYSTEM)
     check("verifier tool schema is strict-clean", well_formed(VERIFY_TOOL))
     eval_tool = _submit_tool(["de_minimis", "lifetime_equity_raised"], [1, 2])
     check("evaluator tool schema is strict-clean", well_formed(eval_tool))

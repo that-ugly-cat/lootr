@@ -100,6 +100,20 @@ SUBMIT_TOOL = {
     "input_schema": {
         "type": "object",
         "properties": {
+            # An empty run and a lazy run look identical from the outside: both
+            # are "0 proposals". This field is what makes the difference legible
+            # — and it is required precisely so that a scan that found nothing
+            # has to account for itself.
+            "search_notes": {
+                "type": "string",
+                "description": (
+                    "What you actually searched, in two or three lines: the queries "
+                    "and pages you went through. When you propose nothing, say why "
+                    "— everything closed, nothing matching the profile, a listing "
+                    "you could not read. This is read by a person deciding whether "
+                    "to trust the empty result."
+                ),
+            },
             "proposals": {
                 "type": "array",
                 "items": {
@@ -126,7 +140,7 @@ SUBMIT_TOOL = {
                 },
             }
         },
-        "required": ["proposals"],
+        "required": ["search_notes", "proposals"],
         "additionalProperties": False,
     },
 }
@@ -218,6 +232,11 @@ one of these cases whenever the call lets the unit be opened after the award.
 - Do not skip something merely because eligibility is unclear. Propose it, say what is unclear in \
 the rationale, and set confidence=low.
 - Be conservative: a wrong proposal costs review time. When unsure, say so rather than guessing.
+- Always fill search_notes, and fill it hardest when you propose nothing. "Nothing found" and \
+"nothing looked for" read the same from outside, and a person has to be able to tell which one \
+this was: name the queries you ran, the pages you actually opened, and what made you stop. If a \
+listing would not load or was not readable, say that too — a source that cannot be read is worth \
+knowing about, and it is not the same as a source with nothing in it.
 - When done, call submit_proposals exactly once."""
 
 
@@ -283,6 +302,7 @@ def scan_source(source: dict) -> dict:
     messages = [{"role": "user", "content": _user_prompt(source)}]
     tools = [WEB_SEARCH_TOOL, SUBMIT_TOOL]
     proposals = None
+    notes = ""
     deadline = time.monotonic() + SOURCE_DEADLINE
 
     for _ in range(MAX_TURNS):
@@ -311,6 +331,7 @@ def scan_source(source: dict) -> dict:
                        if b.type == "tool_use" and b.name == "submit_proposals"), None)
         if submit is not None:
             proposals = submit.input.get("proposals", [])
+            notes = (submit.input.get("search_notes") or "").strip()
             break
 
         messages.append({"role": "assistant", "content": response.content})
@@ -327,7 +348,7 @@ def scan_source(source: dict) -> dict:
 
     stored = _store_proposals(source, proposals)
     return {"source": source["name"], "outcome": "ok",
-            "proposed": len(proposals), "stored": stored}
+            "proposed": len(proposals), "stored": stored, "notes": notes}
 
 
 def due_sources() -> list[dict]:
