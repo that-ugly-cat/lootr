@@ -83,8 +83,15 @@
       <thead><tr>{% for label, key in cols %}<th>{{ label|safe }}</th>{% endfor %}{% if can_edit %}<th></th>{% endif %}</tr></thead>
       <tbody>
       {% for r in rows %}
-        <tr>{% for label, key in cols %}<td>{{ r[key] if r[key] is not none else '—' }}</td>{% endfor %}
+        {% set flags = ('registered', 'is_founder', 'is_shareholder', 'converted') %}
+        <tr>{% for label, key in cols %}<td>
+          {%- if key in flags -%}{{ 'yes' if r[key] else 'no' }}
+          {%- elif r[key] is not none -%}{{ r[key] }}
+          {%- else -%}—{%- endif -%}
+        </td>{% endfor %}
         {% if can_edit %}<td class="actions-inline">
+          <button class="small muted" hx-get="/profile/{{ slug }}/{{ r.id }}/edit"
+                  hx-target="#modal">edit</button>
           <form method="post" action="/profile/{{ slug }}/{{ r.id }}/delete" onsubmit="return confirm('Delete this row?');">
             <button class="small danger" type="submit">×</button></form></td>{% endif %}
         </tr>
@@ -106,7 +113,7 @@
 <h2>Structure</h2>
 
 {{ child('locations', 'Locations', p.all_locations,
-   [('Kind','kind'),('City','city'),('Region','region'),('Code','region_code'),('System','code_system'),('Registered','registered')],
+   [('Kind ' ~ help('location_kind'),'kind'),('City','city'),('Region','region'),('Code ' ~ help('region_code'),'region_code'),('System ' ~ help('code_system'),'code_system'),('Registered ' ~ help('registered'),'registered')],
    [('kind','kind'),('city','city'),('country','country'),('region','region'),('region_code','region code'),('code_system','NUTS'),('registered','1')],
    'Regional eligibility is decided here: many schemes want a formally registered operating unit inside the region.',
    hkey='locations') }}

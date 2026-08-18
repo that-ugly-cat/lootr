@@ -33,6 +33,7 @@
         {% for i in instruments %}<option value="{{ i }}" {% if o.instrument == i %}selected{% endif %}>{{ i }}</option>{% endfor %}
       </select></label>
     {{ yesno('dilutive', 'Dilutive ' ~ help('dilutive'), o.dilutive) }}
+    {{ yesno('is_general', 'General ' ~ help('is_general'), o.is_general) }}
     {{ txt('link', 'Link', o.link, span=true) }}
     <label class="span2">Description <textarea name="description" rows="3">{{ o.description or '' }}</textarea></label>
   </div>

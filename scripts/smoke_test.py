@@ -195,6 +195,59 @@ with TestClient(app) as c:
     r = c.get("/investors")
     check("investors view sorts on next action", "Send updated deck" in r.text)
 
+    r = c.post("/pipeline/new", data={
+        "opportunity_id": str(call_id), "status": "preparing",
+        "product_ids": ["1", "2"], "amount_requested": "50000"},
+        follow_redirects=False)
+    check("multi-product application created", r.status_code == 303)
+    r = c.post("/pipeline/new", data={
+        "opportunity_id": str(call_id), "status": "preparing",
+        "is_general": "1"}, follow_redirects=False)
+    check("general application created", r.status_code == 303)
+    r = c.get("/pipeline")
+    check("both product lines listed on one row",
+          "Beads for open field, Lab formulation B" in r.text)
+    check("general application shows as general", ">general<" in r.text)
+    with get_db() as db:
+        links = db.execute("SELECT COUNT(*) n FROM application_products").fetchone()["n"]
+        gen = db.execute("SELECT COUNT(*) n FROM applications WHERE is_general=1").fetchone()["n"]
+    check("junction rows written", links == 2, str(links))
+    check("general flag stored", gen == 1)
+
+    r = c.get("/pipeline/2/edit")
+    check("application edit modal renders", r.status_code == 200 and "product_ids" in r.text)
+    check("edit modal preselects the products", r.text.count("selected") >= 2)
+    r = c.post("/pipeline/2/edit", data={
+        "opportunity_id": str(call_id), "status": "submitted", "product_ids": ["2"]},
+        follow_redirects=False)
+    check("application edited", r.status_code == 303)
+    with get_db() as db:
+        left = [r["product_id"] for r in db.execute(
+            "SELECT product_id FROM application_products WHERE application_id=2")]
+    check("product set replaced, not appended", left == [2], str(left))
+
+    r = c.post("/pipeline/1/status", data={"status": "submitted"}, follow_redirects=False)
+    check("inline status change", r.status_code == 303)
+    with get_db() as db:
+        row = db.execute("SELECT status, next_action FROM applications WHERE id=1").fetchone()
+    check("status endpoint does not blank other fields",
+          row["status"] == "submitted" and row["next_action"] == "Send updated deck")
+    check("status endpoint rejects an unknown state",
+          c.post("/pipeline/1/status", data={"status": "nonsense"}).status_code == 422)
+
+    print("\n== profile child editing ==")
+    r = c.get("/profile/locations/1/edit")
+    check("child edit modal renders", r.status_code == 200 and "Lecce" in r.text)
+    r = c.post("/profile/locations/1/edit", data={
+        "kind": "registered_office", "city": "Solagna", "country": "IT",
+        "region": "Veneto", "region_code": "ITH3", "code_system": "NUTS",
+        "registered": "1", "notes": "kept"}, follow_redirects=False)
+    check("child row edited", r.status_code == 303)
+    with get_db() as db:
+        row = db.execute("SELECT city, notes FROM company_locations WHERE id=1").fetchone()
+    check("edit keeps the notes it was given", row["city"] == "Solagna" and row["notes"] == "kept")
+    check("unknown child table on edit 404", c.get("/profile/nope/1/edit").status_code == 404)
+
     print("\n== proposals ==")
     with get_db() as db:
         db.execute("INSERT INTO proposals (kind, payload, rationale, confidence, method, source_id) "
@@ -319,7 +372,13 @@ with TestClient(app) as c:
     check("MCP upcoming_deadlines", len(call("upcoming_deadlines", {"days": 2000})) == 1)
     na = call("next_actions", {"days": 365})
     check("MCP next_actions", len(na) == 1 and na[0]["title"] == "Eatable Adventures")
-    check("MCP list_applications", len(call("list_applications")) == 1)
+    apps = call("list_applications")
+    check("MCP list_applications", len(apps) == 3, str(len(apps)))
+    check("MCP applications carry the product set",
+          any(a.get("product_names") == "Lab formulation B" for a in apps),
+          str([a.get("product_names") for a in apps]))
+    check("MCP applications carry the general flag",
+          any(a.get("is_general") == 1 for a in apps))
     check("MCP list_sources", len(call("list_sources")) == 1)
     check("MCP list_proposals pending", call("list_proposals") == [])
     check("MCP list_proposals approved", len(call("list_proposals", {"status": "approved"})) == 2)

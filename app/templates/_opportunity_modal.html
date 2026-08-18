@@ -8,6 +8,7 @@
       {{ o.provider or 'no provider' }}{% if o.provider_type %} · {{ o.provider_type }}{% endif %}
       · <span class="chip">{{ o.instrument or 'no instrument' }}</span>
       {% if o.dilutive %}<span class="chip">dilutive</span>{% endif %}
+      {% if o.is_general %}<span class="chip">general</span>{% endif %}
       {% if o.source_name %} · source: {{ o.source_name }}{% endif %}
     </p>
     {% if o.description %}<p class="small">{{ o.description }}</p>{% endif %}
@@ -82,7 +83,7 @@
       {% if applications %}
       <tr><th>Applications {{ help('applications') }}</th><td>
         {% for a in applications %}
-          <div>{{ a.status }}{% if a.product_name %} · {{ a.product_name }}{% endif %}
+          <div>{{ a.status }}{% if a.product_names %} · {{ a.product_names }}{% elif a.is_general %} · general{% endif %}
           {% if a.amount_requested %} · asked {{ a.amount_requested|money }}{% endif %}
           {% if a.next_action %}<br><span class="sub">next: {{ a.next_action }} ({{ a.next_action_due or 'no date' }})</span>{% endif %}</div>
         {% endfor %}

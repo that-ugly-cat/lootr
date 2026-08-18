@@ -310,9 +310,8 @@ def opportunity_detail(request: Request, opportunity_id: int, user=Depends(requi
             "LEFT JOIN products p ON p.id = f.product_id WHERE f.opportunity_id=?",
             (opportunity_id,))]
         apps = [dict(r) for r in db.execute(
-            "SELECT a.*, p.name AS product_name FROM applications a "
-            "LEFT JOIN products p ON p.id = a.product_id WHERE a.opportunity_id=?",
-            (opportunity_id,))]
+            f"SELECT a.*, {PRODUCTS_SQL} AS product_names FROM applications a "
+            "WHERE a.opportunity_id=?", (opportunity_id,))]
         acts = [dict(r) for r in db.execute(
             "SELECT * FROM activities WHERE opportunity_id=? ORDER BY happened_at DESC LIMIT 20",
             (opportunity_id,))]
@@ -451,6 +450,38 @@ async def child_create(request: Request, child: str, user=Depends(require_editor
     return RedirectResponse(form.get("back") or "/profile", status_code=303)
 
 
+@router.get("/profile/{child}/{row_id}/edit", response_class=HTMLResponse)
+def child_edit(request: Request, child: str, row_id: int, user=Depends(require_editor)):
+    """Generic edit form for a profile child row, in the shared modal. Without
+    it, correcting a typo or filling in an aid regime would mean deleting the
+    row and losing its notes."""
+    if child not in CHILD_TABLES:
+        raise HTTPException(status_code=404, detail="Unknown section")
+    table, fields = CHILD_TABLES[child]
+    with get_db() as db:
+        row = db.execute(f"SELECT * FROM {table} WHERE id=?", (row_id,)).fetchone()
+    if not row:
+        return HTMLResponse("")
+    return templates.TemplateResponse(request, "_child_form_modal.html", {
+        "child": child, "row": dict(row), "fields": fields,
+        "title": child.replace("_", " ").title()})
+
+
+@router.post("/profile/{child}/{row_id}/edit")
+async def child_update(request: Request, child: str, row_id: int,
+                       user=Depends(require_editor)):
+    if child not in CHILD_TABLES:
+        raise HTTPException(status_code=404, detail="Unknown section")
+    table, fields = CHILD_TABLES[child]
+    form = await request.form()
+    values = _form_values(form, fields)
+    sets = ", ".join(f"{k}=?" for k in values)
+    with get_db() as db:
+        db.execute(f"UPDATE {table} SET {sets} WHERE id=?",
+                   list(values.values()) + [row_id])
+    return RedirectResponse(form.get("back") or "/profile", status_code=303)
+
+
 @router.post("/profile/{child}/{row_id}/delete")
 async def child_delete(request: Request, child: str, row_id: int,
                        user=Depends(require_editor)):
@@ -528,17 +559,32 @@ def product_delete(product_id: int, user=Depends(require_admin)):
 # --- pipeline ---------------------------------------------------------------
 
 APPLICATION_FIELDS = [
-    "opportunity_id", "product_id", "status", "amount_requested", "amount_awarded",
+    "opportunity_id", "status", "amount_requested", "amount_awarded",
     "currency", "submitted_at", "outcome_at", "next_action", "next_action_due", "notes",
 ]
+
+# An application covers zero, one or several product lines. Zero plus the
+# general flag means the request is about the company, not a line.
+PRODUCTS_SQL = (
+    "(SELECT GROUP_CONCAT(p.name, ', ') FROM application_products ap "
+    " JOIN products p ON p.id = ap.product_id WHERE ap.application_id = a.id)"
+)
+
+
+def _set_application_products(db, application_id: int, product_ids: list[str]) -> None:
+    db.execute("DELETE FROM application_products WHERE application_id=?", (application_id,))
+    for raw in product_ids:
+        if str(raw).isdigit():
+            db.execute("INSERT OR IGNORE INTO application_products "
+                       "(application_id, product_id) VALUES (?, ?)",
+                       (application_id, int(raw)))
 
 
 @router.get("/pipeline", response_class=HTMLResponse)
 def pipeline_page(request: Request, status: str = "", user=Depends(require_user)):
-    sql = ("SELECT a.*, o.title, o.provider, o.instrument, o.deadline_date, "
-           "p.name AS product_name, u.username AS owner "
+    sql = (f"SELECT a.*, o.title, o.provider, o.instrument, o.deadline_date, "
+           f"{PRODUCTS_SQL} AS product_names, u.username AS owner "
            "FROM applications a LEFT JOIN opportunities o ON o.id = a.opportunity_id "
-           "LEFT JOIN products p ON p.id = a.product_id "
            "LEFT JOIN users u ON u.id = a.owner_user_id")
     args: list = []
     if status:
@@ -566,10 +612,28 @@ async def application_create(request: Request, user=Depends(require_editor)):
     if not values.get("opportunity_id"):
         raise HTTPException(status_code=422, detail="An opportunity is required")
     values["owner_user_id"] = int(user["sub"])
+    values["is_general"] = 1 if form.get("is_general") else 0
     with get_db() as db:
-        db.execute(f"INSERT INTO applications ({', '.join(values)}) "
-                   f"VALUES ({', '.join('?' * len(values))})", list(values.values()))
+        cur = db.execute(f"INSERT INTO applications ({', '.join(values)}) "
+                         f"VALUES ({', '.join('?' * len(values))})", list(values.values()))
+        _set_application_products(db, cur.lastrowid, form.getlist("product_ids"))
     return RedirectResponse("/pipeline", status_code=303)
+
+
+@router.get("/pipeline/{application_id}/edit", response_class=HTMLResponse)
+def application_edit(request: Request, application_id: int, user=Depends(require_editor)):
+    with get_db() as db:
+        row = db.execute("SELECT * FROM applications WHERE id=?", (application_id,)).fetchone()
+        if not row:
+            return HTMLResponse("")
+        selected = [r["product_id"] for r in db.execute(
+            "SELECT product_id FROM application_products WHERE application_id=?",
+            (application_id,))]
+        opportunities = [dict(r) for r in db.execute(
+            "SELECT id, title FROM opportunities ORDER BY title")]
+    return templates.TemplateResponse(request, "_application_modal.html", {
+        "a": dict(row), "selected": selected, "opportunities": opportunities,
+        "products": _all_products(), "states": APPLICATION_STATES})
 
 
 @router.post("/pipeline/{application_id}/edit")
@@ -577,10 +641,24 @@ async def application_update(request: Request, application_id: int,
                              user=Depends(require_editor)):
     form = await request.form()
     values = _form_values(form, APPLICATION_FIELDS)
+    values["is_general"] = 1 if form.get("is_general") else 0
     sets = ", ".join(f"{k}=?" for k in values)
     with get_db() as db:
         db.execute(f"UPDATE applications SET {sets} WHERE id=?",
                    list(values.values()) + [application_id])
+        _set_application_products(db, application_id, form.getlist("product_ids"))
+    return RedirectResponse("/pipeline", status_code=303)
+
+
+@router.post("/pipeline/{application_id}/status")
+def application_set_status(application_id: int, status: str = Form(...),
+                           user=Depends(require_editor)):
+    """The inline dropdown in the table. Its own endpoint so that changing a
+    status cannot quietly blank the fields it does not carry."""
+    if status not in APPLICATION_STATES:
+        raise HTTPException(status_code=422, detail="Unknown status")
+    with get_db() as db:
+        db.execute("UPDATE applications SET status=? WHERE id=?", (status, application_id))
     return RedirectResponse("/pipeline", status_code=303)
 
 

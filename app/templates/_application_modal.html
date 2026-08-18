@@ -1,0 +1,47 @@
+<div class="modal-overlay" onclick="if (event.target === this) document.getElementById('modal').innerHTML = '';">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Edit application</h2>
+      <button class="modal-close" onclick="document.getElementById('modal').innerHTML = '';">✕</button>
+    </div>
+    <form method="post" action="/pipeline/{{ a.id }}/edit">
+      <div class="grid2">
+        <label class="span2">Opportunity
+          <select name="opportunity_id" required>
+            {% for o in opportunities %}
+              <option value="{{ o.id }}" {% if a.opportunity_id == o.id %}selected{% endif %}>{{ o.title }}</option>
+            {% endfor %}
+          </select></label>
+
+        <label class="span2">Product lines {{ help('products') }}
+          <select name="product_ids" multiple size="{{ [products|length, 4]|min if products else 2 }}">
+            {% for p in products %}
+              <option value="{{ p.id }}" {% if p.id in selected %}selected{% endif %}>{{ p.name }}{% if p.trl is not none %} — TRL {{ p.trl }}{% endif %}</option>
+            {% endfor %}
+          </select>
+          <span class="sub">Hold ctrl or cmd to pick more than one.</span></label>
+        <label class="span2 checkline">
+          <input type="checkbox" name="is_general" value="1" {% if a.is_general %}checked{% endif %}>
+          General — this one is about the company, not a product line {{ help('is_general') }}</label>
+
+        <label>Status
+          <select name="status">
+            {% for s in states %}<option value="{{ s }}" {% if a.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select></label>
+        <label>Currency <input name="currency" value="{{ a.currency or '' }}"></label>
+        <label>Amount requested <input name="amount_requested" value="{{ a.amount_requested or '' }}"></label>
+        <label>Amount awarded <input name="amount_awarded" value="{{ a.amount_awarded or '' }}"></label>
+        <label>Submitted <input type="date" name="submitted_at" value="{{ a.submitted_at or '' }}"></label>
+        <label>Outcome <input type="date" name="outcome_at" value="{{ a.outcome_at or '' }}"></label>
+        <label>Next action <input name="next_action" value="{{ a.next_action or '' }}"></label>
+        <label>Due <input type="date" name="next_action_due" value="{{ a.next_action_due or '' }}"></label>
+        <label class="span2">Notes <textarea name="notes" rows="3">{{ a.notes or '' }}</textarea></label>
+      </div>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <button type="button" class="btn muted"
+                onclick="document.getElementById('modal').innerHTML = '';">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>

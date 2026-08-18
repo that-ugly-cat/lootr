@@ -1,0 +1,27 @@
+<div class="modal-overlay" onclick="if (event.target === this) document.getElementById('modal').innerHTML = '';">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Edit {{ title }}</h2>
+      <button class="modal-close" onclick="document.getElementById('modal').innerHTML = '';">✕</button>
+    </div>
+    <form method="post" action="/profile/{{ child }}/{{ row.id }}/edit">
+      <input type="hidden" name="back" value="/profile">
+      <div class="grid2">
+        {% for f in fields %}
+          {% if f in ('notes', 'evidence', 'hints') %}
+            <label class="span2">{{ f.replace('_', ' ') }} {{ help(f) }}
+              <textarea name="{{ f }}" rows="3">{{ row[f] or '' }}</textarea></label>
+          {% else %}
+            <label>{{ f.replace('_', ' ') }} {{ help(f) }}
+              <input name="{{ f }}" value="{{ row[f] if row[f] is not none else '' }}"></label>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <button type="button" class="btn muted"
+                onclick="document.getElementById('modal').innerHTML = '';">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>

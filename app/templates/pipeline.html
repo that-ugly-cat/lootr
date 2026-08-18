@@ -18,27 +18,25 @@
 
 <table>
   <thead><tr>
-    <th>Opportunity</th><th>Product</th><th>Status</th><th>Asked</th>
-    <th>Next action</th><th>Owner</th><th></th>
+    <th>Opportunity</th><th>Products {{ help('is_general') }}</th><th>Status</th>
+    <th>Asked</th><th>Next action</th><th>Owner</th><th></th>
   </tr></thead>
   <tbody>
   {% for a in applications %}
     <tr>
       <td><div class="stack"><strong>{{ a.title or '—' }}</strong>
         <span class="sub">{{ a.provider or '' }}{% if a.deadline_date %} · due {{ a.deadline_date }}{% endif %}</span></div></td>
-      <td class="sub">{{ a.product_name or '—' }}</td>
+      <td class="sub">
+        {%- if a.product_names -%}{{ a.product_names }}
+        {%- elif a.is_general -%}<span class="chip">general</span>
+        {%- else -%}—{%- endif -%}
+      </td>
       <td>
         {% if can_edit %}
-        <form method="post" action="/pipeline/{{ a.id }}/edit" class="inline-form">
-          <input type="hidden" name="opportunity_id" value="{{ a.opportunity_id }}">
-          <input type="hidden" name="product_id" value="{{ a.product_id or '' }}">
-          <input type="hidden" name="amount_requested" value="{{ a.amount_requested or '' }}">
-          <input type="hidden" name="notes" value="{{ a.notes or '' }}">
+        <form method="post" action="/pipeline/{{ a.id }}/status" class="inline-form">
           <select name="status" onchange="this.form.submit()">
             {% for s in states %}<option value="{{ s }}" {% if a.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
           </select>
-          <input type="hidden" name="next_action" value="{{ a.next_action or '' }}">
-          <input type="hidden" name="next_action_due" value="{{ a.next_action_due or '' }}">
         </form>
         {% else %}<span class="chip">{{ a.status }}</span>{% endif %}
       </td>
@@ -49,6 +47,7 @@
       <td class="sub">{{ a.owner or '—' }}</td>
       <td class="actions-inline">
         {% if can_edit %}
+        <button class="small muted" hx-get="/pipeline/{{ a.id }}/edit" hx-target="#modal">edit</button>
         <form method="post" action="/pipeline/{{ a.id }}/delete" onsubmit="return confirm('Remove this application?');">
           <button class="small danger" type="submit">×</button></form>
         {% endif %}
@@ -70,11 +69,14 @@
           <option value="">—</option>
           {% for o in opportunities %}<option value="{{ o.id }}">{{ o.title }}</option>{% endfor %}
         </select></label>
-      <label>Product
-        <select name="product_id">
-          <option value="">—</option>
-          {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
-        </select></label>
+      <label class="span2">Product lines {{ help('products') }}
+        <select name="product_ids" multiple size="{{ products|length if products and products|length < 5 else 4 }}">
+          {% for p in products %}<option value="{{ p.id }}">{{ p.name }}{% if p.trl is not none %} — TRL {{ p.trl }}{% endif %}</option>{% endfor %}
+        </select>
+        <span class="sub">Hold ctrl or cmd to pick more than one.</span></label>
+      <label class="span2 checkline">
+        <input type="checkbox" name="is_general" value="1">
+        General — this one is about the company, not a product line {{ help('is_general') }}</label>
       <label>Status
         <select name="status">
           {% for s in states %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
@@ -90,7 +92,7 @@
 </div>
 
 <div class="card">
-  <h3>Log an activity</h3>
+  <h3>Log an activity {{ help('activities') }}</h3>
   <form method="post" action="/activities/new" class="inline-form">
     <input type="hidden" name="back" value="/pipeline">
     <select name="opportunity_id" required>

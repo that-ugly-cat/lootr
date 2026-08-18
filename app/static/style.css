@@ -257,3 +257,9 @@ th .help { border-color: #23273a; }
 .help-body em { color: var(--warn); font-style: normal; }
 .help-body code { color: var(--accent); }
 .tabs-help { display: flex; align-items: center; }
+
+/* checkbox on its own line, and roomier multi-selects */
+.checkline { display: flex; align-items: center; gap: 0.5rem; }
+.checkline input[type="checkbox"] { width: auto; margin: 0; }
+select[multiple] { padding: 0.3rem; }
+select[multiple] option { padding: 0.15rem 0.3rem; }

@@ -38,6 +38,7 @@ with get_db() as db:
         legal_form       = 'srl',
         country          = 'IT',
         vat_number       = '05317740750',
+        incorporation_date = '2023-12-07',
         industry_codes   = ?,
         sme_size         = 'micro',
         sme_size_definition = 'EU Recommendation 2003/361',
@@ -65,7 +66,7 @@ with get_db() as db:
         'Operating unit.')""")
     db.execute("""INSERT INTO company_locations
         (kind, city, country, region, region_code, code_system, registered, notes)
-        VALUES ('lab', 'Verona', 'IT', 'Veneto', 'ITH3', 'NUTS', 0,
+        VALUES ('lab', 'Solagna', 'IT', 'Veneto', 'ITH3', 'NUTS', 0,
         'Laboratory only, not formally registered. Until it is filed, calls that
         require an operating unit in Veneto are out of reach.')""")
 
@@ -234,9 +235,7 @@ print("""BeadRoots profile seeded.
 
 Left empty on purpose, because nobody has told us yet:
 
-  company     incorporation date — drives the age gate that a lot of calls use,
-              and right now the profile cannot compute an age at all
-              revenue stage, runway, FTE, total assets, last turnover
+  company     revenue stage, runway, FTE, total assets, last turnover
   br.1O       development status, TRL evidence
   br.2O       TRL, development status, regulatory status, licensing position
               on the Tezi application

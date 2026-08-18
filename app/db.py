@@ -181,6 +181,7 @@ CREATE TABLE IF NOT EXISTS opportunities (
     provider_type TEXT,
     instrument    TEXT,
     dilutive      BOOLEAN,
+    is_general    BOOLEAN DEFAULT 0,   -- company-level, not about a product line
     link          TEXT,
     description   TEXT,
     source_id     INTEGER REFERENCES sources(id) ON DELETE SET NULL,
@@ -272,7 +273,7 @@ CREATE TABLE IF NOT EXISTS opportunity_product_fit (
 CREATE TABLE IF NOT EXISTS applications (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     opportunity_id   INTEGER REFERENCES opportunities(id) ON DELETE CASCADE,
-    product_id       INTEGER REFERENCES products(id) ON DELETE SET NULL,
+    is_general       BOOLEAN DEFAULT 0,   -- not tied to any product line
     status           TEXT,
     amount_requested REAL,
     amount_awarded   REAL,
@@ -284,6 +285,13 @@ CREATE TABLE IF NOT EXISTS applications (
     next_action_due  DATE,
     notes            TEXT,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- An application can cover more than one product line at once.
+CREATE TABLE IF NOT EXISTS application_products (
+    application_id INTEGER REFERENCES applications(id) ON DELETE CASCADE,
+    product_id     INTEGER REFERENCES products(id) ON DELETE CASCADE,
+    PRIMARY KEY (application_id, product_id)
 );
 
 CREATE TABLE IF NOT EXISTS activities (
@@ -413,7 +421,7 @@ NARRATIVE_SECTIONS = [
 
 # Fields a proposal may write onto an opportunity.
 OPPORTUNITY_FIELDS = [
-    "title", "provider", "provider_type", "instrument", "dilutive", "link",
+    "title", "provider", "provider_type", "instrument", "dilutive", "is_general", "link",
     "description", "amount_min", "amount_max", "currency", "funding_rate_pct",
     "cofinancing_pct", "advance_available", "disbursement", "aid_regime",
     "call_total_budget", "deadline_type", "deadline_date", "deadline_text",
@@ -460,7 +468,21 @@ def init_db() -> None:
                 (section,),
             )
         db.execute("INSERT OR IGNORE INTO company (id) VALUES (1)")
-        # Future migrations go here: PRAGMA table_info + ALTER TABLE, idempotent.
+
+        # Migration 2026-08-18: an application can cover several product lines,
+        # or none at all when the opportunity is company-level. The single FK
+        # becomes a junction table; existing values are carried over first.
+        acols = [r["name"] for r in db.execute("PRAGMA table_info(applications)")]
+        if "is_general" not in acols:
+            db.execute("ALTER TABLE applications ADD COLUMN is_general BOOLEAN DEFAULT 0")
+        if "product_id" in acols:
+            db.execute(
+                "INSERT OR IGNORE INTO application_products (application_id, product_id) "
+                "SELECT id, product_id FROM applications WHERE product_id IS NOT NULL")
+            db.execute("ALTER TABLE applications DROP COLUMN product_id")
+        ocols = [r["name"] for r in db.execute("PRAGMA table_info(opportunities)")]
+        if "is_general" not in ocols:
+            db.execute("ALTER TABLE opportunities ADD COLUMN is_general BOOLEAN DEFAULT 0")
 
 
 # ------------------------------------------------------------------ helpers

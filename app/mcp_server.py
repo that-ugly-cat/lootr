@@ -155,7 +155,10 @@ def get_opportunity(opportunity_id: int) -> str:
             "LEFT JOIN products p ON p.id = f.product_id WHERE f.opportunity_id=?",
             (opportunity_id,))]
         out["applications"] = [dict(r) for r in db.execute(
-            "SELECT * FROM applications WHERE opportunity_id=?", (opportunity_id,))]
+            "SELECT a.*, (SELECT GROUP_CONCAT(p.name, ', ') FROM application_products ap "
+            " JOIN products p ON p.id = ap.product_id WHERE ap.application_id = a.id) "
+            "AS product_names FROM applications a WHERE a.opportunity_id=?",
+            (opportunity_id,))]
         out["activities"] = [dict(r) for r in db.execute(
             "SELECT * FROM activities WHERE opportunity_id=? ORDER BY happened_at DESC",
             (opportunity_id,))]
@@ -206,11 +209,14 @@ def next_actions(days: int = 30, overdue: bool = True) -> str:
 def list_applications(status: str = "") -> str:
     """Applications filed or being prepared (status: preparing, submitted,
     pending, won, lost, withdrawn; '' for all), with the opportunity and the
-    product line each one is for."""
+    product lines each one covers. An application with no products and
+    is_general set is a company-level request rather than one about a line."""
     sql = (
-        "SELECT a.*, o.title, o.provider, p.name AS product_name FROM applications a "
-        "LEFT JOIN opportunities o ON o.id = a.opportunity_id "
-        "LEFT JOIN products p ON p.id = a.product_id"
+        "SELECT a.*, o.title, o.provider, "
+        "(SELECT GROUP_CONCAT(p.name, ', ') FROM application_products ap "
+        " JOIN products p ON p.id = ap.product_id WHERE ap.application_id = a.id) "
+        "AS product_names FROM applications a "
+        "LEFT JOIN opportunities o ON o.id = a.opportunity_id"
     )
     args: list = []
     if status:

@@ -77,6 +77,44 @@ HELP: dict[str, tuple[str, str]] = {
         <p>A laboratory you use but have not registered does not open that
         region's calls, so the registered flag is a real gate, not paperwork.</p>"""),
 
+    "location_kind": ("Kind of location", """
+        <p>What this address <em>is</em>, in the eyes of the company register: the
+        registered office, an operating unit, a laboratory, a production site.</p>
+        <p>Calls almost never ask for "a presence". They ask for a registered
+        office in the territory, or an operating unit, and those are different
+        filings with different consequences.</p>"""),
+
+    "region_code": ("Region code", """
+        <p>The machine-readable identifier of the region, so eligibility can be
+        matched without depending on how a name is spelled.</p>
+        <p>Italian examples: <code>ITF4</code> is Puglia, <code>ITH3</code> is
+        Veneto, <code>ITC4</code> is Lombardia. A call that says it is open to
+        <code>ITF</code> means the whole South, and a code that starts with the
+        same letters is inside it.</p>"""),
+
+    "code_system": ("Code system", """
+        <p>Which catalogue the code above comes from. <strong>NUTS</strong> is the
+        EU's statistical hierarchy of regions and it is what European and Italian
+        calls use. <strong>ISO 3166-2</strong> is the international alternative.</p>
+        <p>Recording the system alongside the code is what keeps the field
+        portable: a company outside the EU has regions too, they are just not
+        numbered by Eurostat.</p>"""),
+
+    "registered": ("Registered", """
+        <p>Whether this location is formally filed with the company register, not
+        merely used.</p>
+        <p>It is a hard gate. A laboratory you work in every day but have never
+        registered does not open that region's calls, and the tool leaves that
+        region out of the eligible list until the flag is set.</p>"""),
+
+    "is_general": ("General", """
+        <p>Some money is not about a product at all: an investor round, support
+        for a hire, a voucher for advice, a certification cost. Marking an
+        opportunity as general says there is no product line to match it
+        against, so it is judged at company level instead.</p>
+        <p>On an application it means the same thing: the request covers the
+        company, not one line.</p>"""),
+
     "qualifications": ("Qualifications", """
         <p>Legal statuses, certifications and labels that have a validity
         window: an innovative-startup registration, a B-Corp certification, an
