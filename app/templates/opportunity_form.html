@@ -1,13 +1,18 @@
 {% extends "base.html" %}
+{% from "_fields.html" import tags %}
 {% macro txt(name, label, value, type='text', span=false) %}
   <label class="{% if span %}span2{% endif %}">{{ label|safe }}
-    <input type="{{ type }}" name="{{ name }}" value="{{ value if value is not none else '' }}"></label>
+    <input type="{{ type }}" {% if type == 'number' %}step="any"{% endif %}
+           name="{{ name }}" value="{{ value if value is not none else '' }}"></label>
 {% endmacro %}
+{# `value|string` because the column may be an integer while the options are
+   strings: comparing the two directly leaves the select on the dash and the
+   stored value looks lost. #}
 {% macro sel(name, label, value, options) %}
   <label>{{ label|safe }}
     <select name="{{ name }}">
       <option value="">—</option>
-      {% for o in options %}<option value="{{ o }}" {% if value == o %}selected{% endif %}>{{ o.replace('_', ' ') }}</option>{% endfor %}
+      {% for o in options %}<option value="{{ o }}" {% if value is not none and value|string == o %}selected{% endif %}>{{ o.replace('_', ' ') }}</option>{% endfor %}
     </select></label>
 {% endmacro %}
 {% macro dl(name, label, value, options) %}
@@ -34,7 +39,7 @@
   <h3>What it is</h3>
   <div class="grid2">
     {{ txt('title', 'Title *', o.title, span=true) }}
-    {{ txt('provider', 'Provider', o.provider) }}
+    {{ dl('provider', 'Provider', o.provider, opts['provider']) }}
     <label>Provider type {{ help('provider_type') }}
       <select name="provider_type">
         <option value="">—</option>
@@ -55,11 +60,11 @@
 <div class="card">
   <h3>Money {{ help('funding_rate') }}</h3>
   <div class="grid2">
-    {{ txt('amount_min', 'Amount min', o.amount_min) }}
-    {{ txt('amount_max', 'Amount max', o.amount_max) }}
+    {{ txt('amount_min', 'Amount min', o.amount_min, type='number') }}
+    {{ txt('amount_max', 'Amount max', o.amount_max, type='number') }}
     {{ dl('currency', 'Currency', o.currency, ['EUR', 'USD', 'CHF', 'GBP']) }}
-    {{ txt('funding_rate_pct', 'Funding rate %', o.funding_rate_pct) }}
-    {{ txt('cofinancing_pct', 'Co-financing %', o.cofinancing_pct) }}
+    {{ txt('funding_rate_pct', 'Funding rate %', o.funding_rate_pct, type='number') }}
+    {{ txt('cofinancing_pct', 'Co-financing %', o.cofinancing_pct, type='number') }}
     {{ yesno('advance_available', 'Advance available', o.advance_available) }}
     {{ sel('disbursement', 'Disbursement ' ~ help('disbursement'), o.disbursement,
             ['advance', 'milestones', 'reimbursement_on_report']) }}
@@ -81,10 +86,10 @@
     {{ txt('deadline_date', 'Next deadline', o.deadline_date, type='date') }}
     {{ txt('deadline_text', 'Deadline as written', o.deadline_text) }}
     {{ txt('cutoff_dates', 'Cut-off dates (JSON)', o.cutoff_dates) }}
-    {{ txt('recurrence_logic', 'Recurrence', o.recurrence_logic) }}
+    {{ dl('recurrence_logic', 'Recurrence', o.recurrence_logic, opts['recurrence_logic']) }}
     {{ txt('opens_at', 'Opens at', o.opens_at, type='date') }}
-    {{ txt('decision_lag_months', 'Decision lag (months)', o.decision_lag_months) }}
-    {{ txt('project_duration_months', 'Project duration (months)', o.project_duration_months) }}
+    {{ txt('decision_lag_months', 'Decision lag (months)', o.decision_lag_months, type='number') }}
+    {{ txt('project_duration_months', 'Project duration (months)', o.project_duration_months, type='number') }}
   </div>
 </div>
 
@@ -92,18 +97,20 @@
   <h3>Eligibility {{ help('eligibility') }}</h3>
   <div class="grid2">
     {{ txt('eligible_geographies', 'Eligible geographies (JSON)', o.eligible_geographies, span=true) }}
-    {{ txt('requires_unit_in', 'Requires a unit in', o.requires_unit_in) }}
+    {{ dl('requires_unit_in', 'Requires a unit in', o.requires_unit_in, opts['requires_unit_in']) }}
     {{ sel('unit_required_by', 'Unit required by ' ~ help('unit_required_by'), o.unit_required_by, condition_timing) }}
-    {{ txt('unit_deadline_months', 'Months to open it', o.unit_deadline_months) }}
-    {{ txt('max_company_age_years', 'Max company age (years)', o.max_company_age_years) }}
-    {{ txt('eligible_sme_sizes', 'Eligible sizes (JSON)', o.eligible_sme_sizes) }}
-    {{ txt('requires_qualification', 'Requires qualification (JSON)', o.requires_qualification) }}
+    {{ txt('unit_deadline_months', 'Months to open it', o.unit_deadline_months, type='number') }}
+    {{ txt('max_company_age_years', 'Max company age (years)', o.max_company_age_years, type='number') }}
     {{ yesno('requires_partners', 'Partners required', o.requires_partners) }}
     {{ txt('partner_requirements', 'Partner requirements', o.partner_requirements) }}
-    {{ txt('trl_min', 'TRL min', o.trl_min) }}
-    {{ txt('trl_max', 'TRL max', o.trl_max) }}
-    {{ txt('sector_tags', 'Sector tags (JSON)', o.sector_tags) }}
-    {{ txt('impact_focus', 'Impact focus (JSON)', o.impact_focus) }}
+    {{ sel('trl_min', 'TRL min', o.trl_min, trl_levels) }}
+    {{ sel('trl_max', 'TRL max', o.trl_max, trl_levels) }}
+    {{ tags('eligible_sme_sizes', 'Eligible sizes', o.eligible_sme_sizes,
+            tag_options['eligible_sme_sizes'], allow_new=false) }}
+    {{ tags('requires_qualification', 'Requires qualification ' ~ help('requires_qualification'),
+            o.requires_qualification, tag_options['requires_qualification'], allow_new=false) }}
+    {{ tags('sector_tags', 'Sector tags', o.sector_tags, tag_options['sector_tags']) }}
+    {{ tags('impact_focus', 'Impact focus', o.impact_focus, tag_options['impact_focus']) }}
     <label class="span2">Other requirements
       <textarea name="other_requirements" rows="3">{{ o.other_requirements or '' }}</textarea></label>
   </div>
@@ -113,12 +120,12 @@
   <h3>Investor thesis</h3>
   <p class="small muted">Only relevant for equity and convertible instruments.</p>
   <div class="grid2">
-    {{ txt('ticket_min', 'Ticket min', o.ticket_min) }}
-    {{ txt('ticket_max', 'Ticket max', o.ticket_max) }}
+    {{ txt('ticket_min', 'Ticket min', o.ticket_min, type='number') }}
+    {{ txt('ticket_max', 'Ticket max', o.ticket_max, type='number') }}
     {{ dl('stage_focus', 'Stage focus', o.stage_focus,
            ['pre-seed', 'seed', 'series A', 'series B', 'growth']) }}
-    {{ txt('sector_focus', 'Sector focus', o.sector_focus) }}
-    {{ txt('geo_focus', 'Geography focus', o.geo_focus) }}
+    {{ dl('sector_focus', 'Sector focus', o.sector_focus, opts['sector_focus']) }}
+    {{ dl('geo_focus', 'Geography focus', o.geo_focus, opts['geo_focus']) }}
     {{ dl('lead_or_follow', 'Lead or follow', o.lead_or_follow,
            ['lead', 'follow', 'either']) }}
   </div>

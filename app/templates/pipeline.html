@@ -81,10 +81,11 @@
         <select name="status">
           {% for s in states %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
         </select></label>
-      <label>Amount requested <input name="amount_requested"></label>
+      <label>Amount requested <input type="number" step="any" name="amount_requested"></label>
       <label>Currency <input name="currency" list="dl-currency" autocomplete="off" placeholder="EUR">
         <datalist id="dl-currency"><option value="EUR"><option value="USD"><option value="CHF"><option value="GBP"></datalist></label>
-      <label>Next action <input name="next_action"></label>
+      <label>Next action <input name="next_action" list="dl-nextaction" autocomplete="off">
+        <datalist id="dl-nextaction">{% for n in next_actions %}<option value="{{ n }}">{% endfor %}</datalist></label>
       <label>Due <input type="date" name="next_action_due"></label>
       <label class="span2">Notes <textarea name="notes" rows="2"></textarea></label>
     </div>
@@ -98,8 +99,10 @@
     <input type="hidden" name="back" value="/pipeline">
     <div class="grid2">
       <label>Name <input name="name" required></label>
-      <label>Organisation <input name="organisation"></label>
-      <label>Role <input name="role"></label>
+      <label>Organisation <input name="organisation" list="dl-c-organisation" autocomplete="off">
+        <datalist id="dl-c-organisation">{% for v in contact_choices.get('organisation', ('', []))[1] %}<option value="{{ v }}">{% endfor %}</datalist></label>
+      <label>Role <input name="role" list="dl-c-role" autocomplete="off">
+        <datalist id="dl-c-role">{% for v in contact_choices.get('role', ('', []))[1] %}<option value="{{ v }}">{% endfor %}</datalist></label>
       <label>Email <input name="email" type="email"></label>
       <label>LinkedIn <input name="linkedin"></label>
       <label>Relationship
@@ -114,7 +117,7 @@
           {% for o in opportunities %}<option value="{{ o.id }}">{{ o.title }}</option>{% endfor %}
         </select></label>
       <label class="span2">Who can introduce us {{ help('warm_intro') }}
-        <input name="warm_intro_via"></label>
+        <input name="warm_intro_via" list="dl-contactnames" autocomplete="off"></label>
       <label class="span2">Notes <textarea name="notes" rows="2"></textarea></label>
     </div>
     <div class="actions"><button type="submit">Add</button></div>
@@ -133,10 +136,14 @@
       {% for k in ['call', 'email', 'meeting', 'pitch', 'intro', 'submission'] %}<option>{{ k }}</option>{% endfor %}
     </select>
     <input type="date" name="happened_at">
-    <input name="contact_name" placeholder="contact">
+    <input name="contact_name" placeholder="contact" list="dl-contactnames" autocomplete="off">
     <input name="summary" placeholder="what happened" size="40">
     <button class="small" type="submit">log</button>
   </form>
+  {# Shared by the activity log and the warm-intro box above: whoever could
+     introduce you, or whoever you just spoke to, is nearly always someone the
+     contact list already knows. #}
+  <datalist id="dl-contactnames">{% for n in contact_names %}<option value="{{ n }}">{% endfor %}</datalist>
 </div>
 {% endif %}
 

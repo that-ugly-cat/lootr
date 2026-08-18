@@ -64,8 +64,8 @@
     </div>
     {% if can_edit %}
     <form method="post" action="/profile/counters/{{ c.key }}" class="inline-form" style="margin-top:.5rem">
-      <input name="used_amount" value="{{ c.used_amount or 0 }}" size="8" title="used">
-      <input name="ceiling" value="{{ c.ceiling or '' }}" size="8" title="ceiling">
+      <input type="number" step="any" name="used_amount" value="{{ c.used_amount or 0 }}" size="8" title="used">
+      <input type="number" step="any" name="ceiling" value="{{ c.ceiling or '' }}" size="8" title="ceiling">
       <input name="checked_at" type="date" value="{{ c.checked_at or '' }}" title="verified on">
       <input type="hidden" name="source_note" value="{{ c.source_note or '' }}">
       <button class="small" type="submit">save</button>

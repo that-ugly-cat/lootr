@@ -37,6 +37,15 @@ of each cap is recorded verbatim from the call, because that wording is where
 these thresholds actually bite; when it is ambiguous the verdict stays
 `uncertain` rather than guessing.
 
+**Every field is offered as its value set deserves.** A closed set the code
+branches on is a `select`; an open set with recurring values is an input with a
+`datalist`; a multi-value field is a multi-select over `tag_vocabulary` plus a
+box for adding to it. Many datalists are built from what is already in the
+database — providers already recorded, investors, contact names, the region
+codes the company actually uses — so the second time a value is needed it costs
+one keystroke and, more to the point, comes out spelled the same way, because
+these columns get filtered on.
+
 **A gate is not a commitment.** A condition that must hold on the day you apply
 is a gate, and failing one makes the company ineligible. A condition that falls
 due only if the money is won — opening an operating unit in the region, hiring,
@@ -101,6 +110,19 @@ you type. The case that motivates it: the derived gate compares
 `highest_degree == "phd"`, so a free-text "PhD" would silently drop out of the
 doctorate count. One place decides (`CHILD_CHOICES`), one macro renders
 (`_fields.html`), and the same macro serves both the edit modal and the add form.
+
+Two corollaries. **A datalist cannot serve a multi-value field**, because it
+completes the whole box rather than the next item in it: those are a
+multi-select over `tag_vocabulary` plus an add box, and what gets typed there
+joins the vocabulary, so the set stays open and stops being retyped from memory.
+A value already on a record is always among the options, even when the
+vocabulary has never heard of it — otherwise it would vanish from the widget,
+and then from the record on the next save. An empty vocabulary renders no list
+box at all, only the add box: an empty select reads as a broken widget.
+**Some option lists cannot be written down in advance**, because they are made
+of what is already in the database; those are built at render time
+(`DYNAMIC_CHILD_OPTIONS`, `_opportunity_options`) and fall back to a plain text
+box while there is nothing to suggest.
 
 **Verbatim text is kept but is not column material.** A call's own deadline
 wording can run to a paragraph. The table cell shows a short label — the date if

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fields.html" import tags %}
 {% block content %}
 <h1>Company core data {{ help('profile') }}</h1>
 <p class="small muted">
@@ -29,13 +30,13 @@
       <input name="sme_size_definition" value="{{ c.sme_size_definition or '' }}"
              list="dl-smedef" autocomplete="off">
       <datalist id="dl-smedef"><option value="EU Recommendation 2003/361"><option value="national definition"></datalist></label>
-    <label>Headcount <input name="headcount" value="{{ c.headcount or '' }}"></label>
-    <label>FTE <input name="fte" value="{{ c.fte or '' }}"></label>
-    <label>Last turnover <input name="last_turnover" value="{{ c.last_turnover or '' }}"></label>
-    <label>Total assets <input name="total_assets" value="{{ c.total_assets or '' }}"></label>
+    <label>Headcount <input type="number" step="1" name="headcount" value="{{ c.headcount or '' }}"></label>
+    <label>FTE <input type="number" step="any" name="fte" value="{{ c.fte or '' }}"></label>
+    <label>Last turnover <input type="number" step="any" name="last_turnover" value="{{ c.last_turnover or '' }}"></label>
+    <label>Total assets <input type="number" step="any" name="total_assets" value="{{ c.total_assets or '' }}"></label>
     <label>Currency <input name="currency" value="{{ c.currency or '' }}" list="dl-currency" autocomplete="off">
       <datalist id="dl-currency"><option value="EUR"><option value="USD"><option value="CHF"><option value="GBP"></datalist></label>
-    <label>Runway (months) <input name="runway_months" value="{{ c.runway_months or '' }}"></label>
+    <label>Runway (months) <input type="number" step="1" name="runway_months" value="{{ c.runway_months or '' }}"></label>
     <label>Revenue stage
       <select name="revenue_stage">
         {% for s in ['', 'pre_revenue', 'first_sales', 'recurring'] %}
@@ -46,9 +47,7 @@
         {% for s in ['', 'pre_seed', 'seed', 'series_a', 'series_b', 'later'] %}
           <option value="{{ s }}" {% if c.funding_stage == s %}selected{% endif %}>{{ s or '—' }}</option>{% endfor %}
       </select></label>
-    <label class="span2">Impact tags (JSON)
-      <input name="impact_tags" value="{{ c.impact_tags or '' }}"
-             placeholder='["water","climate_adaptation","soil_health"]'></label>
+    {{ tags('impact_tags', 'Impact tags', c.impact_tags, tag_options['impact_tags']) }}
   </div>
 </div>
 <div class="actions">

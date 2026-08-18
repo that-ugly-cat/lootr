@@ -26,9 +26,34 @@ from app.db import get_db, init_db  # noqa: E402
 
 init_db()
 
+# The tag vocabulary is what the multi-value widgets offer, so it is seeded
+# before the guard below and on every run: adding a namespace here reaches an
+# instance that was seeded months ago, and re-running costs nothing because the
+# unique index on (namespace, value) makes each insert idempotent.
+VOCABULARY = {
+    "segment": ["viticulture", "horticulture", "legumes", "open_field",
+                "arable", "nursery", "turf", "landscaping"],
+    "impact": ["water_efficiency", "drought_resilience", "soil_health",
+               "climate_adaptation", "circular_bioeconomy", "biodiversity"],
+    "sector": ["agrifood", "agritech", "biotech", "advanced_materials",
+               "water", "climate", "circular_economy", "deeptech",
+               "bioeconomy", "manufacturing"],
+    "market": ["IT", "EU", "MENA", "north_america", "latin_america"],
+}
+
+# In its own transaction, and before the guard: `get_db` commits when the block
+# ends normally, and the guard below leaves by sys.exit — which would take the
+# vocabulary down with it.
+with get_db() as db:
+    for namespace, values in VOCABULARY.items():
+        for value in values:
+            db.execute(
+                "INSERT OR IGNORE INTO tag_vocabulary (namespace, value, label) "
+                "VALUES (?, ?, ?)", (namespace, value, value.replace("_", " ")))
+
 with get_db() as db:
     if db.execute("SELECT COUNT(*) n FROM products").fetchone()["n"]:
-        print("Already seeded (products exist). Nothing done.")
+        print("Already seeded (products exist). Tag vocabulary refreshed.")
         sys.exit()
 
     # --- company ---------------------------------------------------------
@@ -218,18 +243,8 @@ with get_db() as db:
         "First place in the Innovative Made in Italy category of UniCredit Start Lab "
         "2026, and EIT FAN. Academic partners: Universities of Pavia, Verona and Bari.",))
 
-    # --- tag vocabulary --------------------------------------------------
-
-    for namespace, values in {
-        "segment": ["viticulture", "horticulture", "legumes", "open_field",
-                    "arable", "nursery", "turf", "landscaping"],
-        "impact": ["water_efficiency", "drought_resilience", "soil_health",
-                   "climate_adaptation", "circular_bioeconomy", "biodiversity"],
-    }.items():
-        for value in values:
-            db.execute("INSERT INTO tag_vocabulary (namespace, value, label) "
-                       "VALUES (?, ?, ?)",
-                       (namespace, value, value.replace("_", " ")))
+    # The tag vocabulary is seeded above, before the guard, so that adding a
+    # namespace reaches instances that were seeded long ago.
 
 print("""BeadRoots profile seeded.
 

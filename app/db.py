@@ -533,6 +533,16 @@ def init_db() -> None:
         if "unit_deadline_months" not in ocols:
             db.execute("ALTER TABLE opportunities ADD COLUMN unit_deadline_months INTEGER")
 
+        # Migration 2026-08-18: the tag vocabulary is now written to from the
+        # forms, so a value has to be unique within its namespace — otherwise
+        # every save of a tag would add another copy of it to the dropdown.
+        # Existing duplicates are collapsed to their first row before the index
+        # goes on, because the index cannot be created over them.
+        db.execute("DELETE FROM tag_vocabulary WHERE id NOT IN "
+                   "(SELECT MIN(id) FROM tag_vocabulary GROUP BY namespace, value)")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tag_vocabulary "
+                   "ON tag_vocabulary (namespace, value)")
+
 
 # ------------------------------------------------------------------ helpers
 

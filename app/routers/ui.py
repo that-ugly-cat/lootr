@@ -107,6 +107,26 @@ OPPORTUNITY_STATES = [
 APPLICATION_STATES = ["preparing", "submitted", "pending", "won", "lost", "withdrawn"]
 
 CURRENCIES = ["EUR", "USD", "CHF", "GBP"]
+SME_SIZES = ["micro", "small", "medium", "large"]
+TRL_LEVELS = [str(n) for n in range(1, 10)]
+
+# Multi-value fields hold a JSON array of flat tags, and a datalist cannot serve
+# one: it completes the whole box, not the next item in it. So they get a real
+# multi-select over a known vocabulary, plus a box for values the vocabulary has
+# never seen. What is typed there is written back to `tag_vocabulary`, so the set
+# stays open and grows by use instead of being retyped from memory every time.
+TAG_FIELDS = {
+    "impact_tags": "impact",        # company and products
+    "target_segments": "segment",   # products
+    "target_markets": "market",
+    "sector_tags": "sector",        # opportunities
+    "impact_focus": "impact",
+}
+# Closed multi-value sets: the code reads these, so nothing new may be invented
+# in a text box. Sizes are the EU definition; qualification keys are whatever the
+# company actually holds.
+CLOSED_TAG_FIELDS = {"eligible_sme_sizes", "requires_qualification"}
+MULTI_FIELDS = set(TAG_FIELDS) | CLOSED_TAG_FIELDS
 
 # How each field is offered in the forms.
 #   select   — a closed set the code branches on. Typing something else would
@@ -168,6 +188,77 @@ CHILD_CHOICES = {
     },
 }
 
+# Datalists that cannot be written down in advance, because they are made of what
+# is already in the database. Built at render time, so a form opened after a row
+# was added already offers that row's values.
+DYNAMIC_CHILD_OPTIONS = {
+    "locations": {
+        "region": lambda: _distinct("region", "company_locations"),
+        "region_code": lambda: _distinct("region_code", "company_locations"),
+        "city": lambda: _distinct("city", "company_locations"),
+    },
+    "qualifications": {
+        "label": lambda: _distinct("label", "company_qualifications"),
+    },
+    "team": {
+        "role": lambda: _distinct("role", "team_members",
+                                  ["CEO", "CTO", "COO", "advisor", "employee"]),
+        # Nobody has a region recorded on a fresh instance, so fall back to the
+        # regions the company itself sits in: that is where people usually live.
+        "residence_region": lambda: _distinct(
+            "residence_region", "team_members", _distinct("region", "company_locations")),
+    },
+    "funding": {
+        "investor": lambda: _distinct("investor", "company_funding"),
+    },
+    "aid": {
+        "provider": lambda: _distinct("provider", "company_aid"),
+        "entity": lambda: _distinct("entity", "company_aid"),
+    },
+    "contacts": {
+        "organisation": lambda: _distinct("organisation", "contacts"),
+        "role": lambda: _distinct("role", "contacts",
+                                  ["programme officer", "partner", "analyst",
+                                   "principal", "grant office"]),
+        # Who could introduce you is, almost always, someone already recorded.
+        "warm_intro_via": lambda: _distinct("name", "contacts"),
+    },
+}
+
+
+def _child_choices(child: str) -> dict:
+    """The static widget spec, plus the datalists built from existing rows."""
+    choices = dict(CHILD_CHOICES.get(child, {}))
+    for name, build in DYNAMIC_CHILD_OPTIONS.get(child, {}).items():
+        options = build()
+        if options:
+            choices[name] = ("datalist", options)
+    return choices
+
+
+def _opportunity_options() -> dict:
+    """Datalists for the single-value text fields of the opportunity form."""
+    return {
+        "provider": _distinct("provider", "opportunities"),
+        # Where a unit is required: the codes the company already uses, plus the
+        # two coarse ones, plus whatever other calls have asked for.
+        "requires_unit_in": _distinct(
+            "requires_unit_in", "opportunities",
+            _distinct("region_code", "company_locations", ["IT", "EU"])),
+        "sector_focus": _distinct("sector_focus", "opportunities"),
+        "geo_focus": _distinct("geo_focus", "opportunities"),
+        "recurrence_logic": _distinct(
+            "recurrence_logic", "opportunities",
+            ["annual", "twice a year", "reopened when refinanced", "one-off"]),
+    }
+
+
+def _next_actions() -> list[str]:
+    return _distinct("next_action", "applications",
+                     ["draft the application", "collect quotes", "ask the office",
+                      "submit", "follow up", "send the report"])
+
+
 # Simple child tables of the profile, handled by one generic pair of routes.
 # The whitelist is what keeps the dynamic SQL safe.
 CHILD_TABLES = {
@@ -207,9 +298,70 @@ def _form_values(form, fields: list[str]) -> dict:
     """Empty strings become NULL; checkboxes arrive only when ticked."""
     out = {}
     for f in fields:
+        if f in MULTI_FIELDS:
+            out[f] = _multi_value(form, f)
+            continue
         raw = form.get(f)
         out[f] = None if raw in (None, "") else raw
     return out
+
+
+def _multi_value(form, field: str) -> str | None:
+    """A multi-select plus its 'add' box, back into one JSON array. Order is
+    preserved and duplicates dropped, so ticking a tag that was also typed does
+    not store it twice."""
+    picked = [v.strip() for v in form.getlist(field) if v and v.strip()]
+    typed = [t.strip() for t in (form.get(field + "__new") or "")
+             .replace(";", ",").split(",") if t.strip()]
+    if typed and field in TAG_FIELDS:
+        _remember_tags(TAG_FIELDS[field], typed)
+    values = list(dict.fromkeys(picked + typed))
+    return json.dumps(values, ensure_ascii=False) if values else None
+
+
+def _remember_tags(namespace: str, values: list[str]) -> None:
+    """A tag typed once is in the vocabulary from then on. Without this the
+    'add' box would be a synonym generator: soil_health today, soil health
+    tomorrow, and two tags that mean one thing."""
+    with get_db() as db:
+        for value in values:
+            db.execute(
+                "INSERT OR IGNORE INTO tag_vocabulary (namespace, value, label) "
+                "VALUES (?,?,?)", (namespace, value, value.replace("_", " ")))
+
+
+def _vocabulary(namespace: str, used=()) -> list[str]:
+    with get_db() as db:
+        known = [r["value"] for r in db.execute(
+            "SELECT value FROM tag_vocabulary WHERE namespace=? "
+            "AND COALESCE(active, 1) = 1 ORDER BY value", (namespace,))]
+    return list(dict.fromkeys(known + [u for u in used if u]))
+
+
+def _distinct(column: str, table: str, extra=()) -> list[str]:
+    """Datalist options drawn from what is already recorded. A provider typed
+    once should cost one keystroke the second time — and, more to the point,
+    come out spelled the same way, because these columns get filtered on."""
+    with get_db() as db:
+        seen = [r[0] for r in db.execute(
+            f"SELECT DISTINCT {column} FROM {table} "
+            f"WHERE {column} IS NOT NULL AND {column} != '' ORDER BY {column}")]
+    return list(dict.fromkeys(list(extra) + seen))
+
+
+def _tag_options(record: dict) -> dict:
+    """Options for every multi-value field on a form: the vocabulary, plus what
+    this record already carries. Without that second half, a tag written before
+    the vocabulary knew about it would quietly disappear from the widget — and
+    then from the record, the first time someone pressed Save."""
+    options = {field: _vocabulary(ns, json_field(record.get(field)))
+               for field, ns in TAG_FIELDS.items()}
+    options["eligible_sme_sizes"] = list(dict.fromkeys(
+        SME_SIZES + json_field(record.get("eligible_sme_sizes"))))
+    options["requires_qualification"] = list(dict.fromkeys(
+        _distinct("key", "company_qualifications")
+        + json_field(record.get("requires_qualification"))))
+    return options
 
 
 # --- landing & auth ---------------------------------------------------------
@@ -367,7 +519,8 @@ def opportunity_new(request: Request, view: str = "calls", user=Depends(require_
                    action="/opportunities/new", instruments=INSTRUMENTS,
                    provider_types=PROVIDER_TYPES, states=OPPORTUNITY_STATES,
                    sources=_all_sources(), products=_all_products(),
-                   condition_timing=CONDITION_TIMING)
+                   condition_timing=CONDITION_TIMING, trl_levels=TRL_LEVELS,
+                   opts=_opportunity_options(), tag_options=_tag_options({}))
 
 
 @router.post("/opportunities/new")
@@ -432,11 +585,13 @@ def opportunity_edit(request: Request, opportunity_id: int, view: str = "calls",
         row = db.execute("SELECT * FROM opportunities WHERE id=?", (opportunity_id,)).fetchone()
     if not row:
         return RedirectResponse("/calls", status_code=303)
-    return _render(request, "opportunity_form.html", o=dict(row), view=view,
+    opportunity = dict(row)
+    return _render(request, "opportunity_form.html", o=opportunity, view=view,
                    action=f"/opportunities/{opportunity_id}/edit", instruments=INSTRUMENTS,
                    provider_types=PROVIDER_TYPES, states=OPPORTUNITY_STATES,
                    sources=_all_sources(), products=_all_products(),
-                   condition_timing=CONDITION_TIMING)
+                   condition_timing=CONDITION_TIMING, trl_levels=TRL_LEVELS,
+                   opts=_opportunity_options(), tag_options=_tag_options(opportunity))
 
 
 @router.post("/opportunities/{opportunity_id}/edit")
@@ -532,7 +687,7 @@ def profile_page(request: Request, user=Depends(require_user)):
             "SELECT * FROM company_funding ORDER BY closed_at DESC")]
         profile["all_aid"] = [dict(r) for r in db.execute(
             "SELECT * FROM company_aid ORDER BY granted_at DESC")]
-    meta = {slug: {"fields": fields, "choices": CHILD_CHOICES.get(slug, {})}
+    meta = {slug: {"fields": fields, "choices": _child_choices(slug)}
             for slug, (_, fields) in CHILD_TABLES.items()}
     return _render(request, "profile.html", p=profile, child_meta=meta)
 
@@ -541,8 +696,9 @@ def profile_page(request: Request, user=Depends(require_user)):
 def company_edit(request: Request, user=Depends(require_editor)):
     with get_db() as db:
         row = db.execute("SELECT * FROM company WHERE id=1").fetchone()
-    return _render(request, "company_form.html", c=dict(row) if row else {},
-                   fields=COMPANY_FIELDS)
+    company = dict(row) if row else {}
+    return _render(request, "company_form.html", c=company,
+                   fields=COMPANY_FIELDS, tag_options=_tag_options(company))
 
 
 @router.post("/profile/edit")
@@ -612,7 +768,7 @@ def child_edit(request: Request, child: str, row_id: int, user=Depends(require_e
         return HTMLResponse("")
     return templates.TemplateResponse(request, "_child_form_modal.html", {
         "child": child, "row": dict(row), "fields": fields,
-        "choices": CHILD_CHOICES.get(child, {}),
+        "choices": _child_choices(child),
         "title": child.replace("_", " ").title()})
 
 
@@ -664,7 +820,7 @@ def products_page(request: Request, user=Depends(require_user)):
 @router.get("/products/new", response_class=HTMLResponse)
 def product_new(request: Request, user=Depends(require_editor)):
     return _render(request, "product_form.html", p={}, action="/products/new",
-                   states=PRODUCT_STATES)
+                   states=PRODUCT_STATES, tag_options=_tag_options({}))
 
 
 @router.post("/products/new")
@@ -683,8 +839,10 @@ def product_edit(request: Request, product_id: int, user=Depends(require_editor)
         row = db.execute("SELECT * FROM products WHERE id=?", (product_id,)).fetchone()
     if not row:
         return RedirectResponse("/products", status_code=303)
-    return _render(request, "product_form.html", p=dict(row),
-                   action=f"/products/{product_id}/edit", states=PRODUCT_STATES)
+    product = dict(row)
+    return _render(request, "product_form.html", p=product,
+                   action=f"/products/{product_id}/edit", states=PRODUCT_STATES,
+                   tag_options=_tag_options(product))
 
 
 @router.post("/products/{product_id}/edit")
@@ -755,7 +913,10 @@ def pipeline_page(request: Request, status: str = "", user=Depends(require_user)
     return _render(request, "pipeline.html", applications=rows, f_status=status,
                    opportunities=opportunities, products=_all_products(),
                    activities=activities, contacts=contacts,
-                   states=APPLICATION_STATES, today=date.today().isoformat())
+                   states=APPLICATION_STATES, today=date.today().isoformat(),
+                   next_actions=_next_actions(),
+                   contact_choices=_child_choices("contacts"),
+                   contact_names=_distinct("name", "contacts"))
 
 
 @router.post("/pipeline/new")
@@ -786,7 +947,8 @@ def application_edit(request: Request, application_id: int, user=Depends(require
             "SELECT id, title FROM opportunities ORDER BY title")]
     return templates.TemplateResponse(request, "_application_modal.html", {
         "a": dict(row), "selected": selected, "opportunities": opportunities,
-        "products": _all_products(), "states": APPLICATION_STATES})
+        "products": _all_products(), "states": APPLICATION_STATES,
+        "next_actions": _next_actions()})
 
 
 @router.post("/pipeline/{application_id}/edit")

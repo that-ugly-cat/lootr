@@ -79,6 +79,13 @@ table.detail td { color: var(--label); }
 table.detail tr:hover td { background: transparent; }
 tr.row-disabled td { opacity: 0.45; }
 
+/* A multi-value field: the list of known values, and under it the box that
+   keeps the set open. The box is quieter than the select on purpose — adding a
+   tag is the exception, picking one is the rule. */
+select[multiple] { padding: 0.3rem; }
+select[multiple] option { padding: 0.1rem 0.2rem; }
+input.tag-add { margin-top: 0.3rem; font-size: 0.82rem; }
+
 /* forms & buttons */
 input, select, textarea {
   font: inherit; font-size: 0.88rem; padding: 0.45rem 0.7rem; width: 100%;

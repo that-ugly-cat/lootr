@@ -1,6 +1,30 @@
 {# One field, rendered with the widget its value set deserves.
    `choices` is the per-table spec from CHILD_CHOICES; `ns` namespaces the
    datalist id so two tables on the same page can both offer currencies. #}
+{# A multi-value field, stored as a JSON array.
+   A datalist cannot serve one: it completes the whole box rather than the next
+   item in it, so a list needs a real multi-select. The box underneath is how a
+   value the vocabulary has never seen gets in — without it the widget would
+   close a set that is open. Values already on the record are part of `options`,
+   so nothing that was there stops being offered, or silently disappears on the
+   next save. #}
+{% macro tags(name, label, value, options, allow_new=true) %}
+{% set chosen = value|fromjson %}
+<label class="span2">{{ label|safe }}
+  {%- if options %}
+  <select name="{{ name }}" multiple size="{{ [options|length, 6]|min }}">
+    {% for opt in options %}
+      <option value="{{ opt }}" {% if opt in chosen %}selected{% endif %}>{{ opt.replace('_', ' ') }}</option>
+    {% endfor %}
+  </select>
+  {%- endif %}
+  {%- if allow_new %}
+  <input name="{{ name }}__new" autocomplete="off" class="tag-add"
+         placeholder="add new, comma separated">
+  {%- endif %}
+</label>
+{% endmacro %}
+
 {% macro field(name, value, choices, ns='f', cls='') %}
 {% set spec = choices.get(name) %}
 {% set kind = spec[0] if spec else ('textarea' if name in ('notes', 'evidence', 'hints') else 'text') %}

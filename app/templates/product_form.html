@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fields.html" import tags %}
 {% block content %}
 <h1>{{ 'Edit' if p.id else 'New' }} product line</h1>
 
@@ -42,9 +43,9 @@
     <label>Regulatory status
       <input name="regulatory_status" value="{{ p.regulatory_status or '' }}"
              placeholder="where we are inside it"></label>
-    <label>Target segments (JSON) <input name="target_segments" value="{{ p.target_segments or '' }}"></label>
-    <label>Target markets (JSON) <input name="target_markets" value="{{ p.target_markets or '' }}"></label>
-    <label class="span2">Impact tags (JSON) <input name="impact_tags" value="{{ p.impact_tags or '' }}"></label>
+    {{ tags('target_segments', 'Target segments', p.target_segments, tag_options['target_segments']) }}
+    {{ tags('target_markets', 'Target markets', p.target_markets, tag_options['target_markets']) }}
+    {{ tags('impact_tags', 'Impact tags', p.impact_tags, tag_options['impact_tags']) }}
     <label class="span2">Unit economics <textarea name="unit_economics" rows="2">{{ p.unit_economics or '' }}</textarea></label>
     <label class="span2">Notes <textarea name="notes" rows="2">{{ p.notes or '' }}</textarea></label>
     {% if p.id %}

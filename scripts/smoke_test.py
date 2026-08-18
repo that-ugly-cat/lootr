@@ -705,6 +705,79 @@ with TestClient(app) as c:
           and 'value="reimbursement_on_report"' in r.text)
     check("currency on the opportunity form suggests codes",
           'list="dl-o-currency"' in r.text)
+    check("TRL bounds are selects, not free text",
+          '<select name="trl_min">' in r.text and '<input type="text" name="trl_min"' not in r.text)
+    check("amounts are number inputs", 'type="number" step="any"\n           name="amount_max"'
+          in r.text or 'type="number"' in r.text)
+    check("the provider box suggests providers already recorded",
+          'list="dl-o-provider"' in r.text)
+    check("where a unit is required suggests the codes in use",
+          'list="dl-o-requires_unit_in"' in r.text and '<option value="IT">' in r.text)
+
+    print("\n== multi-value fields ==")
+    # A datalist cannot serve a list: it completes the whole box. These are
+    # multi-selects over a vocabulary, with a way to add to it.
+    check("sizes are a multi-select over the closed set",
+          '<select name="eligible_sme_sizes" multiple' in r.text
+          and '<option value="micro"' in r.text)
+    check("a closed set offers no way to invent a value",
+          'name="eligible_sme_sizes__new"' not in r.text)
+    check("required qualifications come from the ones the company holds",
+          '<select name="requires_qualification" multiple' in r.text
+          and 'value="it_startup_innovativa"' in r.text)
+    # An empty vocabulary must not render an empty list box: on a fresh instance
+    # that reads as a broken widget rather than as a set nobody has filled yet.
+    check("an empty vocabulary shows the add box and no empty list",
+          '<select name="sector_tags" multiple' not in r.text
+          and 'name="sector_tags__new"' in r.text)
+    with get_db() as db:
+        for value in ["agrifood", "biotech"]:
+            db.execute("INSERT OR IGNORE INTO tag_vocabulary (namespace, value, label) "
+                       "VALUES ('sector', ?, ?)", (value, value))
+    r = c.get("/opportunities/new")
+    check("an open tag set lists the vocabulary and can still be added to",
+          '<select name="sector_tags" multiple' in r.text
+          and '<option value="agrifood"' in r.text
+          and 'name="sector_tags__new"' in r.text)
+
+    with get_db() as db:  # the vocabulary a real deployment gets from its seed
+        for value in ["soil_health", "water_efficiency"]:
+            db.execute("INSERT OR IGNORE INTO tag_vocabulary (namespace, value, label) "
+                       "VALUES ('impact', ?, ?)", (value, value.replace("_", " ")))
+    r = c.get("/products/1/edit")
+    check("product tags read the seeded vocabulary",
+          '<select name="impact_tags" multiple' in r.text and 'value="soil_health"' in r.text)
+    with get_db() as db:
+        before = db.execute("SELECT COUNT(*) n FROM tag_vocabulary "
+                            "WHERE namespace='impact'").fetchone()["n"]
+    c.post("/products/1/edit", data={
+        "name": "br.1O", "status": "field_trials", "trl": "6",
+        "impact_tags": ["soil_health", "water_efficiency"],
+        "impact_tags__new": "salinity_tolerance, soil_health", "active": "1"})
+    with get_db() as db:
+        stored = db.execute("SELECT impact_tags FROM products WHERE id=1").fetchone()[0]
+        vocab = [r["value"] for r in db.execute(
+            "SELECT value FROM tag_vocabulary WHERE namespace='impact' ORDER BY value")]
+    check("picked and typed tags land in one JSON array",
+          json.loads(stored) == ["soil_health", "water_efficiency", "salinity_tolerance"],
+          stored)
+    check("a tag typed once joins the vocabulary", "salinity_tolerance" in vocab)
+    check("a tag that was already known is not duplicated",
+          vocab.count("soil_health") == 1 and len(vocab) == before + 1)
+
+    r = c.get("/products/1/edit")
+    check("the new tag comes back as an option, selected",
+          'value="salinity_tolerance" selected' in r.text)
+
+    # The dangerous case: a value written before the vocabulary knew it must not
+    # disappear from the widget, because disappearing from the widget means
+    # disappearing from the record on the next save.
+    with get_db() as db:
+        db.execute("UPDATE products SET target_segments='[\"orchards\"]' WHERE id=1")
+        db.execute("DELETE FROM tag_vocabulary WHERE value='orchards'")
+    r = c.get("/products/1/edit")
+    check("a tag the vocabulary never heard of is still offered and ticked",
+          'value="orchards" selected' in r.text)
 
     r = c.get("/pipeline")
     check("contacts can be created from the pipeline",

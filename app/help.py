@@ -295,6 +295,15 @@ HELP: dict[str, tuple[str, str]] = {
         consumes de minimis, or it is open only to companies that have raised
         less than a stated amount. One call can carry several at once.</p>"""),
 
+    "requires_qualification": ("Required qualifications", """
+        <p>Registrations and certifications a call takes as a precondition:
+        innovative-startup status, a B-Corp certificate, an ISO standard, an EIC
+        Seal of Excellence.</p>
+        <p>The list offers what the company profile actually records, so a call
+        cannot ask for something the tool has no way of checking. If a call
+        requires a qualification that is missing from the list, add it to the
+        profile first — that is also where its expiry date lives.</p>"""),
+
     "commitments": ("Commitments, not gates", """
         <p>What the company would have to take on if this money were won:
         opening an operating unit in the region, hiring, putting up matching
