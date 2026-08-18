@@ -1,0 +1,273 @@
+"""Semantic scan: one Claude call per due source, with server-side web search.
+
+The model gets the company profile and the digest of what is already tracked for
+that source, and files `new` / `update` proposals. Nothing touches the
+opportunities table: everything lands in the queue for human review.
+
+Division of labour with the evaluator: the scanner records **facts as written**
+— including eligibility thresholds, verbatim, in `other_requirements`. Turning
+those into structured caps and judging them against the profile is the
+evaluator's job, because that is interpretation and it has to be recomputable
+when the profile changes.
+"""
+import json
+import os
+from datetime import date
+
+import anthropic
+
+from ..db import OPPORTUNITY_FIELDS, get_db, get_config, opportunities_digest
+from .profile_context import profile_block
+
+MODEL = os.environ.get("LOOTR_MODEL", "claude-opus-5")
+MAX_TURNS = 8
+MAX_WEB_SEARCHES = 14
+CADENCE_DAYS = {"weekly": 7, "monthly": 30, "quarterly": 90}
+
+# Every field arrives as a string or null: SQLite's column affinity converts the
+# numeric and boolean ones on insert, and a flat schema keeps the strict tool
+# small enough to stay reliable.
+_FIELD_PROPS = {f: {"type": ["string", "null"]} for f in OPPORTUNITY_FIELDS}
+
+SUBMIT_TOOL = {
+    "name": "submit_proposals",
+    "description": (
+        "Submit the final list of proposals for this source. Call this exactly once, "
+        "when you have finished searching. Pass an empty array if nothing new or "
+        "changed was found."
+    ),
+    "strict": True,
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "proposals": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {"type": "string", "enum": ["new", "update"]},
+                        "opportunity_id": {
+                            "type": ["integer", "null"],
+                            "description": "ID from the digest for kind=update; null for kind=new",
+                        },
+                        "fields": {
+                            "type": "object",
+                            "properties": _FIELD_PROPS,
+                            "required": list(_FIELD_PROPS.keys()),
+                            "additionalProperties": False,
+                        },
+                        "rationale": {"type": "string"},
+                        "source_url": {"type": "string"},
+                        "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                    },
+                    "required": ["kind", "opportunity_id", "fields", "rationale",
+                                 "source_url", "confidence"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["proposals"],
+        "additionalProperties": False,
+    },
+}
+
+WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search",
+                   "max_uses": MAX_WEB_SEARCHES}
+
+SYSTEM = """You are the discovery engine of Lootr, a funding radar for one company. \
+The company profile below is the whole basis for judging relevance: read it before searching.
+
+Given one source and the digest of what is already tracked for it, use web search to find:
+1. NEW opportunities from this source that suit this company and are not in the digest.
+2. UPDATES to tracked opportunities from this source: a new deadline for a recurring call, \
+changed amounts or rules, a scheme that closed or was discontinued.
+
+What counts as an opportunity is wider than a grant: public contributions, subsidised loans, \
+tax credits, guarantees, prizes and competitions, accelerator or programme places, support for \
+hiring, vouchers, cascade funding from an EU project, and investors. Use `instrument` to say \
+which, and set `is_general` to "1" when the money is about the company rather than a product \
+line (a round, a hire, a certification, advice).
+
+Rules on the facts:
+- Only propose what you actually verified on a page you visited. Every proposal needs its source_url.
+- For kind=update, set opportunity_id to the digest ID and fill ONLY the fields that changed \
+(null for everything else). For kind=new, fill every field you found, null where unknown.
+- Record eligibility thresholds and conditions **in the source's own words** in \
+other_requirements — especially any cap of the form "open only to companies that have raised \
+less than X" or "consumes de minimis". Do not normalise, convert, or interpret them: the exact \
+wording decides whether a cap applies, and a later step judges it against the company's figures.
+- deadline_date is ISO YYYY-MM-DD. deadline_text is the deadline as the call words it. \
+deadline_type is one of fixed, cutoffs, rolling, open_until_funds_exhausted, unknown — a scheme \
+that stays open until the money runs out is open_until_funds_exhausted, not rolling.
+- advance_available and disbursement matter: whether the money arrives up front, on milestones, \
+or only on reimbursement after the spend decides whether a company with a short runway can use it.
+
+Rules on judgement:
+- Skip what the company plainly cannot take: wrong country, wrong sector, a category it does not \
+belong to, a closed scheme with no next edition.
+- Do not skip something merely because eligibility is unclear. Propose it, say what is unclear in \
+the rationale, and set confidence=low.
+- Be conservative: a wrong proposal costs review time. When unsure, say so rather than guessing.
+- When done, call submit_proposals exactly once."""
+
+
+def _user_prompt(source: dict) -> str:
+    # Each source sees its own opportunities plus the ones not yet mapped to any
+    # source, so the model can tell a genuinely new find from a duplicate.
+    digest = [o for o in opportunities_digest()
+              if o.get("source_id") in (source["id"], None)]
+    return (
+        profile_block()
+        + f"\n\n# SOURCE TO SCAN\n- name: {source['name']}\n"
+        f"- url: {source['url'] or '(none)'}\n"
+        f"- geography: {source['geo_hint'] or '(any)'}\n"
+        f"- instruments: {source['instrument_hint'] or '(any)'}\n"
+        f"- search hints: {source['hints'] or '(none)'}\n\n"
+        f"# ALREADY TRACKED FOR THIS SOURCE (JSON)\n"
+        + json.dumps(digest, ensure_ascii=False, default=str)
+    )
+
+
+def _duplicate_pending(db, kind: str, opportunity_id, title: str | None) -> bool:
+    if kind == "update" and opportunity_id:
+        return db.execute(
+            "SELECT id FROM proposals WHERE kind='update' AND opportunity_id=? "
+            "AND status='pending'", (opportunity_id,),
+        ).fetchone() is not None
+    if kind == "new" and title:
+        return db.execute(
+            "SELECT id FROM proposals WHERE kind='new' AND status='pending' "
+            "AND json_extract(payload, '$.title') = ?", (title,),
+        ).fetchone() is not None
+    return False
+
+
+def _store_proposals(source: dict, proposals: list[dict]) -> int:
+    stored = 0
+    with get_db() as db:
+        for p in proposals:
+            fields = {k: v for k, v in (p.get("fields") or {}).items()
+                      if k in OPPORTUNITY_FIELDS and v not in (None, "")}
+            kind, oid = p.get("kind"), p.get("opportunity_id")
+            if kind not in ("new", "update") or (kind == "update" and not oid):
+                continue
+            if kind == "new" and not fields.get("title"):
+                continue
+            if _duplicate_pending(db, kind, oid, fields.get("title")):
+                continue
+            db.execute(
+                "INSERT INTO proposals (kind, opportunity_id, source_id, payload, "
+                "rationale, source_url, confidence, method) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 'llm_scan')",
+                (kind, oid if kind == "update" else None, source["id"],
+                 json.dumps(fields, ensure_ascii=False), p.get("rationale", ""),
+                 p.get("source_url", ""), p.get("confidence", "medium")),
+            )
+            stored += 1
+    return stored
+
+
+def scan_source(source: dict) -> dict:
+    """One agentic loop over a single source."""
+    client = anthropic.Anthropic()
+    messages = [{"role": "user", "content": _user_prompt(source)}]
+    tools = [WEB_SEARCH_TOOL, SUBMIT_TOOL]
+    proposals = None
+
+    for _ in range(MAX_TURNS):
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=16000,
+            output_config={"effort": "high"},
+            system=SYSTEM,
+            tools=tools,
+            messages=messages,
+        )
+
+        # Check the stop reason before reading content: a refusal carries no
+        # answer, and an empty content list would break the search below.
+        if response.stop_reason == "refusal":
+            return {"source": source["name"], "outcome": "error", "detail": "refusal"}
+
+        submit = next((b for b in response.content
+                       if b.type == "tool_use" and b.name == "submit_proposals"), None)
+        if submit is not None:
+            proposals = submit.input.get("proposals", [])
+            break
+
+        messages.append({"role": "assistant", "content": response.content})
+        if response.stop_reason in ("pause_turn", "tool_use"):
+            # Server-side tools ran; nothing for us to execute, just continue.
+            continue
+        messages.append({"role": "user", "content":
+                         "Call submit_proposals now with your findings "
+                         "(an empty array if there is nothing)."})
+
+    if proposals is None:
+        return {"source": source["name"], "outcome": "error",
+                "detail": "no submit_proposals call"}
+
+    stored = _store_proposals(source, proposals)
+    return {"source": source["name"], "outcome": "ok",
+            "proposed": len(proposals), "stored": stored}
+
+
+def due_sources() -> list[dict]:
+    """Sources whose cadence has come round. Weekly suits competitions and
+    accelerator batches; monthly suits bodies that publish one call a year."""
+    default = get_config("default_scan_cadence", "monthly")
+    with get_db() as db:
+        rows = [dict(r) for r in db.execute("SELECT * FROM sources WHERE enabled=1")]
+        due = []
+        for source in rows:
+            days = CADENCE_DAYS.get(source["scan_cadence"] or default, 30)
+            if not source["last_scanned_at"]:
+                due.append(source)
+                continue
+            fresh = db.execute(
+                "SELECT date(?) >= date('now', ?) AS fresh",
+                (source["last_scanned_at"], f"-{days} days"),
+            ).fetchone()["fresh"]
+            if not fresh:
+                due.append(source)
+    return due
+
+
+def run_scan(source_id: int | None = None, only_due: bool = False) -> list[dict]:
+    """Scan one source, every enabled source, or only the ones that are due.
+    Called by the scheduler (only_due=True) and by the buttons in the UI."""
+    if source_id:
+        with get_db() as db:
+            row = db.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
+        sources = [dict(row)] if row else []
+    elif only_due:
+        sources = due_sources()
+    else:
+        with get_db() as db:
+            sources = [dict(r) for r in
+                       db.execute("SELECT * FROM sources WHERE enabled=1")]
+
+    results = []
+    for source in sources:
+        with get_db() as db:
+            log_id = db.execute("INSERT INTO scan_log (source_id) VALUES (?)",
+                                (source["id"],)).lastrowid
+        try:
+            result = scan_source(source)
+        except anthropic.APIError as e:
+            result = {"source": source["name"], "outcome": "error",
+                      "detail": f"API error: {e}"}
+        except Exception as e:  # one broken source must not kill the scheduler
+            result = {"source": source["name"], "outcome": "error", "detail": repr(e)}
+        with get_db() as db:
+            db.execute(
+                "UPDATE scan_log SET finished_at=CURRENT_TIMESTAMP, outcome=?, detail=? "
+                "WHERE id=?",
+                (result["outcome"], json.dumps(result, ensure_ascii=False), log_id),
+            )
+            if result["outcome"] == "ok":
+                db.execute("UPDATE sources SET last_scanned_at=CURRENT_TIMESTAMP "
+                           "WHERE id=?", (source["id"],))
+        print(f"[scan] {result}")
+        results.append(result)
+    return results

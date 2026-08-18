@@ -14,10 +14,13 @@ os.environ["LOOTR_DB"] = DB
 os.environ["ADMIN_USERNAME"] = "spit"
 os.environ["ADMIN_PASSWORD"] = "test-password-123"
 os.environ["JWT_SECRET"] = "smoke-secret-smoke-secret-smoke-secret"
+os.environ["LOOTR_SCHEDULER"] = "0"   # no background jobs during the test
+os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-not-used-in-tests")
 sys.path.insert(0, os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else "."))
 
 from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app  # noqa: E402
+from app.db import OPPORTUNITY_FIELDS as OPPORTUNITY_FIELDS_FOR_TEST  # noqa: E402
 from app.db import get_db  # noqa: E402
 
 fails = []
@@ -429,5 +432,148 @@ with TestClient(app) as c:
                               "/opportunities/new"]
             if 'class="help"' not in c.get(path).text]
     check("every page carries help affordances", not thin, str(thin))
+
+    print("\n== discovery: gates and wiring ==")
+    for path in ["/scan-now", "/check-links-now", "/evaluate-stale",
+                 f"/opportunities/{call_id}/check", f"/opportunities/{call_id}/evaluate"]:
+        code = TestClient(app).post(path).status_code
+        check(f"{path} needs a login", code == 401, str(code))
+    with get_db() as db:
+        db.execute("UPDATE opportunities SET link=? WHERE id=?",
+                   ("https://example.org/call", call_id))
+    r = c.get(f"/opportunities/{call_id}/detail")
+    check("modal offers Evaluate", ">Evaluate<" in r.text)
+    check("modal offers Check when there is a link", ">Check<" in r.text)
+    r = c.get("/sources")
+    check("sources page offers Scan all / Check links",
+          "Scan all now" in r.text and "Check links" in r.text)
+
+    print("\n== discovery: prompt context ==")
+    from app.discovery.profile_context import opportunity_block, profile_block
+    block = profile_block()
+    check("profile block carries the company", "BeadRoots S.r.l." in block)
+    check("profile block carries derived age", "age in years" in block)
+    check("profile block flags unregistered sites", "NOT REGISTERED" in block)
+    check("profile block carries products with TRL",
+          "Beads for open field" in block and "TRL" in block)
+    check("profile block carries the counters", "de_minimis" in block)
+    check("profile block names the empty narrative sections", "Not recorded:" in block)
+    check("profile block drops empty fields", ": None" not in block)
+    with get_db() as db:
+        opp = dict(db.execute("SELECT * FROM opportunities WHERE id=?", (call_id,)).fetchone())
+    ob = opportunity_block(opp)
+    check("opportunity block is JSON with no nulls",
+          '"title"' in ob and "null" not in ob)
+
+    print("\n== discovery: cadence ==")
+    from app.discovery.scanner import SUBMIT_TOOL, due_sources
+    check("a never-scanned source is due", any(s["id"] == 1 for s in due_sources()))
+    with get_db() as db:
+        db.execute("UPDATE sources SET last_scanned_at=CURRENT_TIMESTAMP WHERE id=1")
+    check("a just-scanned monthly source is not due", not any(s["id"] == 1 for s in due_sources()))
+    with get_db() as db:
+        db.execute("UPDATE sources SET last_scanned_at=date('now','-40 days') WHERE id=1")
+    check("a monthly source is due again after 40 days",
+          any(s["id"] == 1 for s in due_sources()))
+    with get_db() as db:
+        db.execute("UPDATE sources SET scan_cadence='quarterly' WHERE id=1")
+    check("the same source is not due yet on a quarterly cadence",
+          not any(s["id"] == 1 for s in due_sources()))
+    with get_db() as db:
+        db.execute("UPDATE sources SET enabled=0, scan_cadence='monthly', "
+                   "last_scanned_at=NULL WHERE id=1")
+    check("a disabled source is never due", not any(s["id"] == 1 for s in due_sources()))
+    with get_db() as db:
+        db.execute("UPDATE sources SET enabled=1 WHERE id=1")
+
+    print("\n== discovery: strict schemas ==")
+    from app.discovery.evaluator import _submit_tool
+    from app.discovery.verifier import SUBMIT_TOOL as VERIFY_TOOL
+
+    def well_formed(tool):
+        def walk(node):
+            if not isinstance(node, dict):
+                return True
+            if node.get("type") == "object":
+                props = set(node.get("properties", {}))
+                if node.get("additionalProperties") is not False:
+                    return False
+                if set(node.get("required", [])) != props:
+                    return False
+            return all(walk(v) for v in node.values() if isinstance(v, (dict, list))) and all(
+                walk(i) for v in node.values() if isinstance(v, list) for i in v)
+        json.dumps(tool)  # must serialise
+        return tool.get("strict") is True and walk(tool["input_schema"])
+
+    check("scanner tool schema is strict-clean", well_formed(SUBMIT_TOOL))
+    check("verifier tool schema is strict-clean", well_formed(VERIFY_TOOL))
+    eval_tool = _submit_tool(["de_minimis", "lifetime_equity_raised"], [1, 2])
+    check("evaluator tool schema is strict-clean", well_formed(eval_tool))
+    check("evaluator enumerates only real counters",
+          eval_tool["input_schema"]["properties"]["caps"]["items"]["properties"]
+          ["counter_key"]["enum"] == ["de_minimis", "lifetime_equity_raised"])
+    check("evaluator enumerates only real products",
+          eval_tool["input_schema"]["properties"]["product_fit"]["items"]["properties"]
+          ["product_id"]["enum"] == [1, 2])
+
+    print("\n== discovery: writing results (no API call) ==")
+    from app.discovery.evaluator import _write_result, stale_evaluations
+    from app.discovery.verifier import _apply_result
+
+    with get_db() as db:  # clear the MCP-filed pending update first
+        db.execute("UPDATE proposals SET status='rejected' WHERE kind='update' "
+                   "AND opportunity_id=? AND status='pending'", (call_id,))
+        opp = dict(db.execute("SELECT * FROM opportunities WHERE id=?",
+                              (call_id,)).fetchone())
+    verdict = _apply_result(opp, {
+        "matches": False,
+        "fields": {k: None for k in OPPORTUNITY_FIELDS_FOR_TEST}
+        | {"amount_max": "1500000", "title": opp["title"]},
+        "rationale": "The page now states a higher ceiling.",
+        "source_url": "https://example.org/call", "confidence": "high"})
+    check("verifier files a diff proposal", verdict["outcome"] == "diff_proposed")
+    check("verifier ignores fields that did not change", verdict["changes"] == 1)
+    with get_db() as db:
+        payload = json.loads(db.execute(
+            "SELECT payload FROM proposals WHERE method='llm_check' "
+            "ORDER BY id DESC LIMIT 1").fetchone()["payload"])
+    check("only the changed field is in the payload", list(payload) == ["amount_max"])
+    again = _apply_result(opp, {"matches": False, "fields": {"amount_max": "1500000"},
+                                "rationale": "", "source_url": "", "confidence": "low"})
+    check("verifier does not stack a second pending diff", again["outcome"] == "pending_exists")
+
+    written = _write_result(opp, {
+        "eligibility_verdict": "eligible",
+        "eligibility_rationale": "Registered office in the eligible region; age within range.",
+        "caps": [{"counter_key": "de_minimis", "max_amount": None, "comparator": "lte",
+                  "scope_note": "the gross grant equivalent counts against de minimis",
+                  "verdict": "pass"}],
+        "product_fit": [
+            {"product_id": 1, "verdict": "eligible", "fit_score": 88, "rationale": "TRL fits."},
+            {"product_id": 2, "verdict": "not_eligible", "fit_score": 5, "rationale": "Too early."}],
+        "overall_fit_score": 88, "fit_rationale": "Squarely on theme.",
+        "best_fit_product_id": 1, "effort": "high"})
+    check("evaluator writes a verdict", written["outcome"] == "eligible")
+    with get_db() as db:
+        row = dict(db.execute("SELECT * FROM opportunities WHERE id=?", (call_id,)).fetchone())
+        caps = db.execute("SELECT * FROM opportunity_caps WHERE opportunity_id=?",
+                          (call_id,)).fetchall()
+        fits = db.execute("SELECT * FROM opportunity_product_fit WHERE opportunity_id=?",
+                          (call_id,)).fetchall()
+    check("evaluator replaces caps rather than appending", len(caps) == 1)
+    check("evaluator replaces product fit rather than appending", len(fits) == 2)
+    check("evaluator keeps the verbatim perimeter",
+          "gross grant equivalent" in caps[0]["scope_note"])
+    check("evaluator stamps the advisory columns",
+          row["fit_score"] == 88 and row["best_fit_product_id"] == 1
+          and row["effort"] == "high" and row["eligibility_checked_at"])
+    check("evaluator leaves status alone", row["status"] == "shortlisted")
+    check("evaluator leaves factual fields alone", row["amount_max"] == 1500000)
+
+    check("a freshly evaluated row is not stale",
+          not any(s["id"] == call_id for s in stale_evaluations()))
+    c.post("/profile/edit", data={"legal_name": "BeadRoots S.r.l.", "headcount": "3"})
+    check("a profile edit makes every older verdict stale",
+          any(s["id"] == call_id for s in stale_evaluations()))
 print("\n" + ("ALL GREEN" if not fails else f"{len(fails)} FAILURES: {fails}"))
 sys.exit(1 if fails else 0)

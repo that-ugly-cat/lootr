@@ -2,6 +2,7 @@
 proposals queue, sources, admin, auth."""
 import json
 import os
+import threading
 from datetime import date
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -13,6 +14,10 @@ from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
                     new_api_key, require_admin, require_editor, require_user,
                     verify_password)
 from ..db import OPPORTUNITY_FIELDS, company_profile, get_db, json_field, status_condition
+from ..discovery.evaluator import evaluate_opportunity, run_evaluations, stale_evaluations
+from ..discovery.link_monitor import run_link_monitor
+from ..discovery.scanner import run_scan
+from ..discovery.verifier import verify_opportunity
 from ..help import HELP
 from ..help import get as get_help
 from ..proposals import (EQUITY_INSTRUMENTS, EQUITY_PROVIDERS, approve,
@@ -234,6 +239,8 @@ def _opportunities_page(request: Request, view: str, q: str, instrument: str,
            "today": date.today().isoformat()}
     if request.headers.get("HX-Request"):
         return _render(request, "_opportunities_table.html", **ctx)
+    ctx["stale_count"] = len(stale_evaluations())
+    ctx["started"] = request.query_params.get("started")
     return _render(request, "opportunities.html", **ctx)
 
 
@@ -354,6 +361,49 @@ async def opportunity_update(request: Request, opportunity_id: int,
     return RedirectResponse(f"/{form.get('view') or 'calls'}", status_code=303)
 
 
+# --- discovery, on demand -----------------------------------------------------
+# Every one of these can take a minute or more, so they run on a thread and the
+# page comes straight back. Results land in the queue, the scan log, or the
+# record itself, and the next page load shows them.
+
+def _background(fn, *args) -> None:
+    threading.Thread(target=fn, args=args, daemon=True).start()
+
+
+@router.post("/opportunities/{opportunity_id}/check")
+def opportunity_check(opportunity_id: int, view: str = Form("calls"),
+                      user=Depends(require_editor)):
+    """Verifier: does the stored record still match the page?"""
+    _background(verify_opportunity, opportunity_id)
+    return RedirectResponse(f"/{view}?started=check", status_code=303)
+
+
+@router.post("/opportunities/{opportunity_id}/evaluate")
+def opportunity_evaluate(opportunity_id: int, view: str = Form("calls"),
+                         user=Depends(require_editor)):
+    """Evaluator: eligibility, caps and fit against the current profile."""
+    _background(evaluate_opportunity, opportunity_id)
+    return RedirectResponse(f"/{view}?started=evaluate", status_code=303)
+
+
+@router.post("/evaluate-stale")
+def evaluate_stale(user=Depends(require_editor)):
+    _background(run_evaluations, True)
+    return RedirectResponse("/calls?started=evaluate", status_code=303)
+
+
+@router.post("/scan-now")
+def scan_now(source_id: int | None = Form(None), user=Depends(require_editor)):
+    _background(run_scan, source_id)
+    return RedirectResponse("/sources?started=scan", status_code=303)
+
+
+@router.post("/check-links-now")
+def check_links_now(user=Depends(require_editor)):
+    _background(run_link_monitor)
+    return RedirectResponse("/sources?started=links", status_code=303)
+
+
 @router.post("/opportunities/{opportunity_id}/delete")
 def opportunity_delete(opportunity_id: int, view: str = Form("calls"),
                        user=Depends(require_admin)):
@@ -404,7 +454,8 @@ async def company_update(request: Request, user=Depends(require_editor)):
     fields = _form_values(form, COMPANY_FIELDS)
     sets = ", ".join(f"{k}=?" for k in fields)
     with get_db() as db:
-        db.execute(f"UPDATE company SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE id=1",
+        db.execute(f"UPDATE company SET {sets}, "
+                   f"updated_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE id=1",
                    list(fields.values()))
     return RedirectResponse("/profile", status_code=303)
 

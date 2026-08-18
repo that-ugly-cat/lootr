@@ -5,30 +5,54 @@
 - MCP mounted at /mcp, reachable either with an X-API-Key header or via a
   capability URL /mcp/k/{key} (pattern Contrarian): the middleware validates
   the key, rewrites the path, and the MCP app stays auth-unaware.
-
-Still to come: the three discovery processes (link monitor, semantic scan,
-fit evaluator) and the scheduler that drives them.
+- Discovery inside the app, on a scheduler: a nightly link monitor with no model
+  in the loop, a semantic scan that respects each source's own cadence, and a
+  nightly pass over evaluations the profile has made stale.
 """
 import os
 from contextlib import asynccontextmanager
 
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import bootstrap_admin, check_api_key
 from .db import company_profile, init_db
+from .discovery.evaluator import run_evaluations
+from .discovery.link_monitor import run_link_monitor
+from .discovery.scanner import run_scan
 from .mcp_server import build_asgi_app, mcp
 from .routers import api, ui
 from .version import commit_hash
+
+scheduler = BackgroundScheduler(timezone="Europe/Rome")
+
+
+def _scheduled_scan():
+    """Runs nightly but only touches sources whose own cadence has come round —
+    weekly for competitions and batches, monthly for the rest."""
+    run_scan(only_due=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     bootstrap_admin()
+    if os.environ.get("LOOTR_SCHEDULER", "1") == "1":
+        scheduler.add_job(run_link_monitor, CronTrigger(hour=3, minute=0),
+                          id="link_monitor")
+        scheduler.add_job(_scheduled_scan, CronTrigger(hour=4, minute=0), id="llm_scan")
+        # Newly approved rows have no verdict yet, and a profile edit makes every
+        # older verdict provisional. Both are picked up here.
+        scheduler.add_job(lambda: run_evaluations(stale_only=True),
+                          CronTrigger(hour=5, minute=0), id="evaluator")
+        scheduler.start()
     async with mcp.session_manager.run():
         yield
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
 
 
 # Built at import time: this also registers the session manager on `mcp`, which

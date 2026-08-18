@@ -1,6 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
 
+{% if started %}
+<div class="card highlight small">
+  {% if started == 'evaluate' %}Evaluation started in the background. It takes a minute or two per row — reload to see the verdicts.
+  {% elif started == 'check' %}Verification started in the background. Any discrepancy lands in the proposals queue.
+  {% endif %}
+</div>
+{% endif %}
+{% if stale_count and user.role in ('admin', 'editor') %}
+<div class="card highlight small">
+  <strong>{{ stale_count }}</strong> row{{ '' if stale_count == 1 else 's' }} judged before the last change to the profile, or never judged at all. A verdict is only as current as the profile it was measured against. {{ help('eligibility') }}
+  <form method="post" action="/evaluate-stale" style="display:inline-block; margin-left:.6rem">
+    <button class="small" type="submit">Evaluate them</button>
+  </form>
+</div>
+{% endif %}
+
 <div class="tabs">
   <a href="/calls" class="{% if view == 'calls' %}on{% endif %}">Calls</a>
   <a href="/investors" class="{% if view == 'investors' %}on{% endif %}">Investors</a>

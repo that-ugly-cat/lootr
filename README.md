@@ -60,14 +60,34 @@ app/
     ui.py            web UI
     api.py           REST dumps and JSON CRUD
   discovery/
-    link_monitor.py  nightly, no LLM                    (to come)
-    scanner.py       per-source semantic scan           (to come)
-    verifier.py      single-record check                (to come)
-    evaluator.py     eligibility, caps and fit score    (to come)
+    profile_context.py  the profile, rendered for a prompt
+    link_monitor.py     nightly, no model in the loop
+    scanner.py          per-source semantic scan, per-source cadence
+    verifier.py         does the record still match the page
+    evaluator.py        eligibility, caps and fit per product line
 scripts/
   seed_demo.py     invented data, for looking at the UI
   smoke_test.py    end-to-end check of everything above
 ```
+
+## The three discovery processes
+
+**Link monitor**, nightly, no model in the loop. Fetches every link, hashes the
+page, files a `flag` proposal when one dies or changes. Costs nothing, so it
+runs every night and tells the scan where to look first.
+
+**Semantic scan**, one Claude call per source with server-side web search. Runs
+nightly but only touches sources whose own cadence has come round — weekly for
+competitions and accelerator batches, monthly for bodies that publish one call a
+year. It records facts *as written*, thresholds included, and files proposals.
+
+**Evaluator**, the one process that writes outside the queue. What it writes are
+judgements, not facts: eligibility with its reasoning, the caps a call imposes
+with their perimeter quoted verbatim, a fit score per product line, and an
+effort estimate. They are advisory and recomputable; it never touches a factual
+field, a status, or a manual priority. Because a verdict is only meaningful
+relative to the profile it was measured against, a profile edit marks every
+older verdict stale and the UI offers to re-run them.
 
 ## Roles
 

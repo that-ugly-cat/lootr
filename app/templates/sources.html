@@ -1,7 +1,24 @@
 {% extends "base.html" %}
 {% set can_edit = user.role in ('admin', 'editor') %}
 {% block content %}
-<h1>Sources {{ help('sources') }}</h1>
+<div class="section-head">
+  <h1>Sources {{ help('sources') }}</h1>
+  {% if can_edit %}
+  <div class="actions">
+    <form method="post" action="/scan-now">
+      <button class="small" type="submit">Scan all now</button></form>
+    <form method="post" action="/check-links-now">
+      <button class="small muted" type="submit">Check links</button></form>
+  </div>
+  {% endif %}
+</div>
+{% if request.query_params.get('started') %}
+<div class="card highlight small">
+  {% if request.query_params.get('started') == 'scan' %}Scan started in the background. Each source takes a couple of minutes; findings land in the proposals queue and the scan log below.
+  {% else %}Link check started in the background. Dead or changed pages land in the proposals queue as flags.
+  {% endif %}
+</div>
+{% endif %}
 <p class="small muted">
   Where discovery looks. A source is only useful if its pages are public and indexed:
   a directory behind a paywall cannot be searched, however rich it is.
@@ -23,6 +40,9 @@
       <td class="sub nowrap">{{ s.last_scanned_at or 'never' }}</td>
       <td class="actions-inline">
         {% if can_edit %}
+        <form method="post" action="/scan-now">
+          <input type="hidden" name="source_id" value="{{ s.id }}">
+          <button class="small muted" type="submit">scan</button></form>
         <a class="btn small muted" href="/sources/{{ s.id }}/edit">edit</a>
         <form method="post" action="/sources/{{ s.id }}/toggle">
           <button class="small muted" type="submit">{{ 'disable' if s.enabled else 'enable' }}</button></form>

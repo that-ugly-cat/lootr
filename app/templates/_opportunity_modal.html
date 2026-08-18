@@ -117,6 +117,16 @@
     {% if user.role in ('admin', 'editor') %}
     <div class="actions">
       <a class="btn small" href="/opportunities/{{ o.id }}/edit">Edit</a>
+      <form method="post" action="/opportunities/{{ o.id }}/evaluate">
+        <input type="hidden" name="view" value="{{ 'investors' if o.dilutive else 'calls' }}">
+        <button class="small muted" type="submit" title="Eligibility, caps and fit against the current profile">Evaluate</button>
+      </form>
+      {% if o.link %}
+      <form method="post" action="/opportunities/{{ o.id }}/check">
+        <input type="hidden" name="view" value="{{ 'investors' if o.dilutive else 'calls' }}">
+        <button class="small muted" type="submit" title="Check the stored record against the page">Check</button>
+      </form>
+      {% endif %}
       {% if user.role == 'admin' %}
       <form method="post" action="/opportunities/{{ o.id }}/delete"
             onsubmit="return confirm('Delete this opportunity and its proposals?');">
