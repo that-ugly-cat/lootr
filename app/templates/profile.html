@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fields.html" import field %}
 {% set can_edit = user.role in ('admin', 'editor') %}
 {% block content %}
 
@@ -74,7 +75,8 @@
   {% endfor %}
 </div>
 
-{% macro child(slug, title, rows, cols, form_fields, hint='', hkey='') %}
+{% macro child(slug, title, rows, cols, hint='', hkey='') %}
+{% set meta = child_meta[slug] %}
 <details class="section">
   <summary>{{ title }} ({{ rows|length }}) {{ help(hkey) }}</summary>
   <div class="body">
@@ -101,10 +103,18 @@
       </tbody>
     </table>
     {% if can_edit %}
-    <form method="post" action="/profile/{{ slug }}/new" class="inline-form">
-      {% for name, placeholder in form_fields %}<input name="{{ name }}" placeholder="{{ placeholder }}">{% endfor %}
-      <button class="small" type="submit">add</button>
-    </form>
+    <details class="addrow">
+      <summary>add a row</summary>
+      <form method="post" action="/profile/{{ slug }}/new">
+        <div class="grid2">
+          {% for f in meta.fields %}
+            {{ field(f, none, meta.choices, ns=slug,
+                     cls='span2' if f in ('notes', 'evidence', 'hints') else '') }}
+          {% endfor %}
+        </div>
+        <div class="actions"><button class="small" type="submit">Add</button></div>
+      </form>
+    </details>
     {% endif %}
   </div>
 </details>
@@ -114,31 +124,26 @@
 
 {{ child('locations', 'Locations', p.all_locations,
    [('Kind ' ~ help('location_kind'),'kind'),('City','city'),('Region','region'),('Code ' ~ help('region_code'),'region_code'),('System ' ~ help('code_system'),'code_system'),('Registered ' ~ help('registered'),'registered')],
-   [('kind','kind'),('city','city'),('country','country'),('region','region'),('region_code','region code'),('code_system','NUTS'),('registered','1')],
    'Regional eligibility is decided here: many schemes want a formally registered operating unit inside the region.',
    hkey='locations') }}
 
 {{ child('qualifications', 'Qualifications', p.all_qualifications,
    [('Key','key'),('Label','label'),('Jurisdiction','jurisdiction'),('Status','status'),('Valid until','valid_until'),('Confirmed','confirmed_at')],
-   [('key','key'),('label','label'),('jurisdiction','IT'),('status','active'),('valid_until','valid until'),('confirmed_at','confirmed on'),('renewal_every_months','12')],
    'Legal statuses, certifications and labels with a validity window. Also the home for things that are themselves keys to other funding.',
    hkey='qualifications') }}
 
 {{ child('team', 'Team', p.all_team,
    [('Name','name'),('Role','role'),('Founder','is_founder'),('Degree','highest_degree'),('Joined','joined_at'),('Left','left_at')],
-   [('name','name'),('role','role'),('is_founder','1'),('gender','f/m'),('birth_year','1990'),('residence_region','region'),('highest_degree','phd'),('joined_at','joined'),('left_at','left')],
    'Departures keep their row with a leaving date: the track record was built with them.',
    hkey='team_gates') }}
 
 {{ child('funding', 'Funding history', p.all_funding,
    [('Instrument','instrument'),('Amount','amount'),('Investor','investor'),('Closed','closed_at'),('Converted','converted')],
-   [('instrument','instrument'),('amount','amount'),('currency','EUR'),('investor','investor'),('closed_at','closed on'),('converted','1/0')],
    'Whether a convertible has converted decides how it counts against equity-raised caps.',
    hkey='funding_history') }}
 
 {{ child('aid', 'Public aid ledger', p.all_aid,
    [('Name','name'),('Provider','provider'),('Regime','regime'),('Nominal','nominal_amount'),('GGE ' ~ help('gge'),'gge_amount'),('Granted','granted_at')],
-   [('name','name'),('provider','provider'),('regime','de_minimis'),('nominal_amount','nominal'),('gge_amount','GGE'),('currency','EUR'),('granted_at','granted on')],
    'What counts against a ceiling is the gross grant equivalent, on the date of the award decision.',
    hkey='aid_ledger') }}
 
@@ -146,7 +151,7 @@
 <p class="small muted">Markdown, injected verbatim into the scan and evaluation prompts.</p>
 {% for section, content in p.narrative.items() %}
 <details class="section">
-  <summary>{{ section.replace('_', ' ') }} {% if not content %}<span class="narrative-empty">— empty</span>{% endif %}</summary>
+  <summary>{{ section.replace('_', ' ') }} {{ help('narrative_' ~ section) }}{% if not content %}<span class="narrative-empty">— empty</span>{% endif %}</summary>
   <div class="body">
     {% if can_edit %}
     <form method="post" action="/profile/narrative">

@@ -12,7 +12,11 @@
         <option value="">—</option>
         {% for s in states %}<option value="{{ s }}" {% if p.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
       </select></label>
-    <label>TRL {{ help('trl') }} <input name="trl" value="{{ p.trl if p.trl is not none else '' }}"></label>
+    <label>TRL {{ help('trl') }}
+      <select name="trl">
+        <option value="">—</option>
+        {% for n in range(1, 10) %}<option value="{{ n }}" {% if p.trl == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select></label>
     <label>TRL updated <input type="date" name="trl_updated_at" value="{{ p.trl_updated_at or '' }}"></label>
     <label>IP status {{ help('ip') }}
       <select name="ip_status">
@@ -24,7 +28,17 @@
     <label class="span2">IP references <input name="ip_refs" value="{{ p.ip_refs or '' }}"></label>
     <label>Regulatory framework {{ help('regulatory') }}
       <input name="regulatory_framework" value="{{ p.regulatory_framework or '' }}"
-             placeholder="which regime applies"></label>
+             list="dl-regframework" autocomplete="off" placeholder="which regime applies">
+      <datalist id="dl-regframework">
+        <option value="EU fertilising products (Reg. 2019/1009)">
+        <option value="EU plant biostimulant">
+        <option value="IT: product with a specific action on soil">
+        <option value="EU medical devices (MDR)">
+        <option value="EU novel food">
+        <option value="REACH">
+        <option value="CE marking">
+        <option value="none">
+      </datalist></label>
     <label>Regulatory status
       <input name="regulatory_status" value="{{ p.regulatory_status or '' }}"
              placeholder="where we are inside it"></label>

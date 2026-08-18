@@ -38,9 +38,11 @@
           {%- elif o.amount_min -%}from {{ o.amount_min|money }} {{ o.currency or '' }}
           {%- else -%}—{%- endif -%}
         </td>
-        <td class="nowrap {% if o.deadline_date and o.deadline_date < today %}deadline-past{% endif %}">
-          {{ o.deadline_date or o.deadline_text or '—' }}
-          {% if o.deadline_type and o.deadline_type != 'fixed' %}<br><span class="sub">{{ o.deadline_type }}</span>{% endif %}
+        <td class="deadline {% if o.deadline_date and o.deadline_date < today %}deadline-past{% endif %}"
+            title="{{ o.deadline_text or '' }}">
+          {{ deadline_label(o) }}
+          {% if o.deadline_date and o.deadline_type and o.deadline_type not in ('fixed', 'unknown') %}
+            <br><span class="sub">{{ o.deadline_type.replace('_', ' ') }}</span>{% endif %}
         </td>
         <td>
           {% if o.fit_score is not none %}

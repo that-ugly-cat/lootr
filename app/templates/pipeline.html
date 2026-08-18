@@ -82,9 +82,39 @@
           {% for s in states %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
         </select></label>
       <label>Amount requested <input name="amount_requested"></label>
-      <label>Currency <input name="currency" placeholder="EUR"></label>
+      <label>Currency <input name="currency" list="dl-currency" autocomplete="off" placeholder="EUR">
+        <datalist id="dl-currency"><option value="EUR"><option value="USD"><option value="CHF"><option value="GBP"></datalist></label>
       <label>Next action <input name="next_action"></label>
       <label>Due <input type="date" name="next_action_due"></label>
+      <label class="span2">Notes <textarea name="notes" rows="2"></textarea></label>
+    </div>
+    <div class="actions"><button type="submit">Add</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Add a contact {{ help('warm_intro') }}</h3>
+  <form method="post" action="/profile/contacts/new">
+    <input type="hidden" name="back" value="/pipeline">
+    <div class="grid2">
+      <label>Name <input name="name" required></label>
+      <label>Organisation <input name="organisation"></label>
+      <label>Role <input name="role"></label>
+      <label>Email <input name="email" type="email"></label>
+      <label>LinkedIn <input name="linkedin"></label>
+      <label>Relationship
+        <select name="relationship">
+          <option value="">—</option>
+          {% for rel in ['cold', 'contacted', 'met', 'engaged', 'passed'] %}
+            <option value="{{ rel }}">{{ rel }}</option>{% endfor %}
+        </select></label>
+      <label class="span2">Opportunity
+        <select name="opportunity_id">
+          <option value="">— not tied to one —</option>
+          {% for o in opportunities %}<option value="{{ o.id }}">{{ o.title }}</option>{% endfor %}
+        </select></label>
+      <label class="span2">Who can introduce us {{ help('warm_intro') }}
+        <input name="warm_intro_via"></label>
       <label class="span2">Notes <textarea name="notes" rows="2"></textarea></label>
     </div>
     <div class="actions"><button type="submit">Add</button></div>
@@ -109,6 +139,33 @@
   </form>
 </div>
 {% endif %}
+
+<h2>Contacts {{ help('warm_intro') }}</h2>
+<table>
+  <thead><tr><th>Name</th><th>Organisation</th><th>Opportunity</th><th>Relationship</th><th>Intro via</th><th></th></tr></thead>
+  <tbody>
+  {% for ct in contacts %}
+    <tr>
+      <td><div class="stack"><strong>{{ ct.name }}</strong>
+        {% if ct.role %}<span class="sub">{{ ct.role }}</span>{% endif %}</div></td>
+      <td class="sub">{{ ct.organisation or '—' }}</td>
+      <td class="sub">{{ ct.opportunity_title or '—' }}</td>
+      <td>{% if ct.relationship %}<span class="chip">{{ ct.relationship }}</span>{% else %}—{% endif %}</td>
+      <td class="sub">{{ ct.warm_intro_via or '—' }}</td>
+      <td class="actions-inline">
+        {% if can_edit %}
+        <button class="small muted" hx-get="/profile/contacts/{{ ct.id }}/edit" hx-target="#modal">edit</button>
+        <form method="post" action="/profile/contacts/{{ ct.id }}/delete" onsubmit="return confirm('Delete this contact?');">
+          <input type="hidden" name="back" value="/pipeline">
+          <button class="small danger" type="submit">×</button></form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted small">No contacts yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
 
 <h2>Recent activity {{ help('activities') }}</h2>
 <table>

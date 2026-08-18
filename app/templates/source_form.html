@@ -6,8 +6,10 @@
   <div class="grid2">
     <label>Name <input name="name" value="{{ source.name or '' }}" required></label>
     <label>URL <input name="url" value="{{ source.url or '' }}"></label>
-    <label>Geography <input name="geo_hint" value="{{ source.geo_hint or '' }}"></label>
-    <label>Instruments <input name="instrument_hint" value="{{ source.instrument_hint or '' }}"></label>
+    <label>Geography <input name="geo_hint" value="{{ source.geo_hint or '' }}" list="dl-geohint" autocomplete="off">
+      <datalist id="dl-geohint"><option value="IT"><option value="EU"><option value="IT-Puglia"><option value="IT-Lombardia"><option value="IT-Veneto"><option value="IT-Mezzogiorno"></datalist></label>
+    <label>Instruments <input name="instrument_hint" value="{{ source.instrument_hint or '' }}" list="dl-insthint" autocomplete="off">
+      <datalist id="dl-insthint"><option value="grant"><option value="subsidized_loan"><option value="prize"><option value="voucher"><option value="programme"><option value="vc"><option value="angel"><option value="hiring_support"></datalist></label>
     <label>Cadence {{ help('scan_cadence') }}
       <select name="scan_cadence">
         {% for c in ['', 'weekly', 'monthly', 'quarterly'] %}

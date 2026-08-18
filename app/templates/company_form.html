@@ -10,8 +10,10 @@
 <div class="card">
   <div class="grid2">
     <label class="span2">Legal name <input name="legal_name" value="{{ c.legal_name or '' }}"></label>
-    <label>Legal form <input name="legal_form" value="{{ c.legal_form or '' }}" placeholder="srl"></label>
-    <label>Country (ISO) <input name="country" value="{{ c.country or '' }}" placeholder="IT"></label>
+    <label>Legal form <input name="legal_form" value="{{ c.legal_form or '' }}" list="dl-legalform" autocomplete="off">
+      <datalist id="dl-legalform"><option value="srl"><option value="srls"><option value="spa"><option value="sapa"><option value="snc"><option value="sas"><option value="GmbH"><option value="SAS"><option value="Ltd"><option value="BV"></datalist></label>
+    <label>Country (ISO) <input name="country" value="{{ c.country or '' }}" list="dl-country" autocomplete="off">
+      <datalist id="dl-country"><option value="IT"><option value="CH"><option value="DE"><option value="FR"><option value="ES"><option value="AT"><option value="NL"></datalist></label>
     <label>VAT number <input name="vat_number" value="{{ c.vat_number or '' }}"></label>
     <label>Registry id <input name="registry_id" value="{{ c.registry_id or '' }}"></label>
     <label class="span2">Industry codes (JSON)
@@ -25,12 +27,14 @@
       </select></label>
     <label class="span2">Size definition
       <input name="sme_size_definition" value="{{ c.sme_size_definition or '' }}"
-             placeholder="EU Recommendation 2003/361"></label>
+             list="dl-smedef" autocomplete="off">
+      <datalist id="dl-smedef"><option value="EU Recommendation 2003/361"><option value="national definition"></datalist></label>
     <label>Headcount <input name="headcount" value="{{ c.headcount or '' }}"></label>
     <label>FTE <input name="fte" value="{{ c.fte or '' }}"></label>
     <label>Last turnover <input name="last_turnover" value="{{ c.last_turnover or '' }}"></label>
     <label>Total assets <input name="total_assets" value="{{ c.total_assets or '' }}"></label>
-    <label>Currency <input name="currency" value="{{ c.currency or '' }}" placeholder="EUR"></label>
+    <label>Currency <input name="currency" value="{{ c.currency or '' }}" list="dl-currency" autocomplete="off">
+      <datalist id="dl-currency"><option value="EUR"><option value="USD"><option value="CHF"><option value="GBP"></datalist></label>
     <label>Runway (months) <input name="runway_months" value="{{ c.runway_months or '' }}"></label>
     <label>Revenue stage
       <select name="revenue_stage">

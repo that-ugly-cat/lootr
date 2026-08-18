@@ -1,0 +1,37 @@
+{# One field, rendered with the widget its value set deserves.
+   `choices` is the per-table spec from CHILD_CHOICES; `ns` namespaces the
+   datalist id so two tables on the same page can both offer currencies. #}
+{% macro field(name, value, choices, ns='f', cls='') %}
+{% set spec = choices.get(name) %}
+{% set kind = spec[0] if spec else ('textarea' if name in ('notes', 'evidence', 'hints') else 'text') %}
+<label class="{{ cls }}">{{ name.replace('_', ' ') }} {{ help(name) }}
+  {%- if kind == 'bool' %}
+    <select name="{{ name }}">
+      <option value="" {% if value is none %}selected{% endif %}>not recorded</option>
+      <option value="1" {% if value == 1 %}selected{% endif %}>yes</option>
+      <option value="0" {% if value == 0 %}selected{% endif %}>no</option>
+    </select>
+  {%- elif kind == 'select' %}
+    <select name="{{ name }}">
+      <option value="">—</option>
+      {% for opt in spec[1] %}
+        <option value="{{ opt }}" {% if value is not none and value|string == opt %}selected{% endif %}>{{ opt.replace('_', ' ') }}</option>
+      {% endfor %}
+    </select>
+  {%- elif kind == 'datalist' %}
+    <input name="{{ name }}" value="{{ value if value is not none else '' }}"
+           list="dl-{{ ns }}-{{ name }}" autocomplete="off">
+    <datalist id="dl-{{ ns }}-{{ name }}">
+      {% for opt in spec[1] %}<option value="{{ opt }}">{% endfor %}
+    </datalist>
+  {%- elif kind == 'date' %}
+    <input type="date" name="{{ name }}" value="{{ value or '' }}">
+  {%- elif kind == 'number' %}
+    <input type="number" step="any" name="{{ name }}" value="{{ value if value is not none else '' }}">
+  {%- elif kind == 'textarea' %}
+    <textarea name="{{ name }}" rows="2">{{ value or '' }}</textarea>
+  {%- else %}
+    <input name="{{ name }}" value="{{ value if value is not none else '' }}">
+  {%- endif %}
+</label>
+{% endmacro %}

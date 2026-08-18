@@ -263,3 +263,17 @@ th .help { border-color: #23273a; }
 .checkline input[type="checkbox"] { width: auto; margin: 0; }
 select[multiple] { padding: 0.3rem; }
 select[multiple] option { padding: 0.15rem 0.3rem; }
+
+/* the deadline column: the call's own wording can run to a paragraph, so the
+   cell shows a short label and the full text lives in the modal */
+td.deadline { max-width: 11rem; white-space: normal; }
+/* collapsed "add a row" form inside a profile section */
+details.addrow { margin-top: 0.6rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
+details.addrow > summary {
+  cursor: pointer; font-size: 0.78rem; font-weight: 700; color: var(--accent-dim);
+  list-style: none;
+}
+details.addrow > summary::-webkit-details-marker { display: none; }
+details.addrow > summary::before { content: "+ "; }
+details.addrow[open] > summary { color: var(--muted); }
+details.addrow[open] > summary::before { content: "− "; }

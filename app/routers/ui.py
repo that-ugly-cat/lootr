@@ -65,6 +65,32 @@ def _help_button(key: str) -> Markup:
 
 templates.env.globals["help"] = _help_button
 
+DEADLINE_LABELS = {
+    "open_until_funds_exhausted": "while funds last",
+    "rolling": "rolling",
+    "cutoffs": "cut-off dates",
+    "unknown": "date unknown",
+}
+
+
+def _deadline_label(o) -> str:
+    """A short label for the table cell. `deadline_text` is the call's own
+    wording and can run to a paragraph — that belongs in the modal, not in a
+    column. The date wins when there is one; otherwise the type says the useful
+    thing, and only as a last resort do we show a clipped quotation."""
+    if o.get("deadline_date"):
+        return str(o["deadline_date"])
+    kind = o.get("deadline_type")
+    if kind in DEADLINE_LABELS:
+        return DEADLINE_LABELS[kind]
+    text = (o.get("deadline_text") or "").strip()
+    if not text:
+        return "—"
+    return text if len(text) <= 42 else text[:42].rstrip() + "…"
+
+
+templates.env.globals["deadline_label"] = _deadline_label
+
 INSTRUMENTS = [
     "grant", "subsidized_loan", "tax_credit", "guarantee", "prize", "programme",
     "hiring_support", "voucher", "cascade_grant", "equity", "convertible", "in_kind",
@@ -78,6 +104,68 @@ OPPORTUNITY_STATES = [
     "won", "lost", "expired", "discarded",
 ]
 APPLICATION_STATES = ["preparing", "submitted", "pending", "won", "lost", "withdrawn"]
+
+CURRENCIES = ["EUR", "USD", "CHF", "GBP"]
+
+# How each field is offered in the forms.
+#   select   — a closed set the code branches on. Typing something else would
+#              silently break a derived gate, so it is not offered.
+#   datalist — an open set with common values: pick one or write your own.
+#   bool     — yes / no / not recorded, stored as 1 / 0 / NULL.
+#   date, number — the right input type, nothing more.
+# Anything absent is a plain text box.
+CHILD_CHOICES = {
+    "locations": {
+        "kind": ("datalist", ["registered_office", "operating_unit", "lab",
+                              "production", "warehouse"]),
+        "country": ("datalist", ["IT", "CH", "DE", "FR", "ES", "AT", "SI", "NL"]),
+        "code_system": ("datalist", ["NUTS", "ISO-3166-2"]),
+        "registered": ("bool", []),
+        "active_from": ("date", []), "active_until": ("date", []),
+    },
+    "qualifications": {
+        "key": ("datalist", ["it_startup_innovativa", "it_pmi_innovativa", "bcorp",
+                             "iso_9001", "iso_14001", "eic_seal_of_excellence",
+                             "women_led_certification"]),
+        "jurisdiction": ("datalist", ["IT", "EU", "CH", "global"]),
+        # company_profile() selects on status='active', so this one is closed.
+        "status": ("select", ["active", "applied", "expired", "none"]),
+        "valid_from": ("date", []), "valid_until": ("date", []),
+        "confirmed_at": ("date", []),
+        "renewal_every_months": ("number", []),
+    },
+    "team": {
+        # The derived gates compare these exactly; a free-text "PhD" or "female"
+        # would read as neither.
+        "highest_degree": ("select", ["phd", "md", "msc", "bsc", "other"]),
+        "gender": ("select", ["f", "m", "other", "not_recorded"]),
+        "is_founder": ("bool", []), "is_shareholder": ("bool", []),
+        "residence_country": ("datalist", ["IT", "CH", "DE", "FR", "ES"]),
+        "birth_year": ("number", []), "shareholding_pct": ("number", []),
+        "fte": ("number", []),
+        "joined_at": ("date", []), "left_at": ("date", []),
+    },
+    "funding": {
+        "instrument": ("datalist", ["equity", "convertible", "safe", "grant",
+                                    "prize", "programme", "loan"]),
+        "currency": ("datalist", CURRENCIES),
+        "converted": ("bool", []),
+        "closed_at": ("date", []),
+        "amount": ("number", []), "dilution_pct": ("number", []),
+    },
+    "aid": {
+        # The counter cross-check filters on these exact values.
+        "regime": ("select", ["de_minimis", "de_minimis_agri", "block_exempted",
+                              "notified", "market_terms", "unknown"]),
+        "currency": ("datalist", CURRENCIES),
+        "granted_at": ("date", []),
+        "nominal_amount": ("number", []), "gge_amount": ("number", []),
+    },
+    "contacts": {
+        "relationship": ("select", ["cold", "contacted", "met", "engaged", "passed"]),
+        "opportunity_id": ("number", []),
+    },
+}
 
 # Simple child tables of the profile, handled by one generic pair of routes.
 # The whitelist is what keeps the dynamic SQL safe.
@@ -437,7 +525,9 @@ def profile_page(request: Request, user=Depends(require_user)):
             "SELECT * FROM company_funding ORDER BY closed_at DESC")]
         profile["all_aid"] = [dict(r) for r in db.execute(
             "SELECT * FROM company_aid ORDER BY granted_at DESC")]
-    return _render(request, "profile.html", p=profile)
+    meta = {slug: {"fields": fields, "choices": CHILD_CHOICES.get(slug, {})}
+            for slug, (_, fields) in CHILD_TABLES.items()}
+    return _render(request, "profile.html", p=profile, child_meta=meta)
 
 
 @router.get("/profile/edit", response_class=HTMLResponse)
@@ -515,6 +605,7 @@ def child_edit(request: Request, child: str, row_id: int, user=Depends(require_e
         return HTMLResponse("")
     return templates.TemplateResponse(request, "_child_form_modal.html", {
         "child": child, "row": dict(row), "fields": fields,
+        "choices": CHILD_CHOICES.get(child, {}),
         "title": child.replace("_", " ").title()})
 
 
@@ -650,10 +741,14 @@ def pipeline_page(request: Request, status: str = "", user=Depends(require_user)
             "SELECT a.*, o.title FROM activities a "
             "LEFT JOIN opportunities o ON o.id = a.opportunity_id "
             "ORDER BY a.happened_at DESC LIMIT 30")]
+        contacts = [dict(r) for r in db.execute(
+            "SELECT c.*, o.title AS opportunity_title FROM contacts c "
+            "LEFT JOIN opportunities o ON o.id = c.opportunity_id "
+            "ORDER BY c.organisation, c.name")]
     return _render(request, "pipeline.html", applications=rows, f_status=status,
                    opportunities=opportunities, products=_all_products(),
-                   activities=activities, states=APPLICATION_STATES,
-                   today=date.today().isoformat())
+                   activities=activities, contacts=contacts,
+                   states=APPLICATION_STATES, today=date.today().isoformat())
 
 
 @router.post("/pipeline/new")

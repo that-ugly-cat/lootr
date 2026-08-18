@@ -174,6 +174,77 @@ HELP: dict[str, tuple[str, str]] = {
         <strong>Exclusions</strong> is what you do not want, and it cuts noise
         before it reaches the queue.</p>"""),
 
+    # --- the narrative sections, one each: these are the fields nobody knows
+    # how to fill in until someone says what they are for.
+
+    "narrative_pitch": ("Pitch", """
+        <p>What the company does, in the words you would use to someone who has
+        never heard of it. Two or three sentences: the problem, what you make,
+        what it changes.</p>
+        <p>This is the first thing the search reads, and it decides what counts
+        as "relevant" for everything that follows. Write it plainly — a pitch
+        heavy with slogans searches worse than one that says what the thing
+        is.</p>"""),
+
+    "narrative_technology": ("Technology", """
+        <p>How it actually works, and where each product line stands. Materials,
+        process, what is proven and what is not.</p>
+        <p>It matters because thematic calls are written in technical vocabulary.
+        A call about biobased materials, or water use efficiency, or circular
+        bioeconomy will only match you if the words that describe your technology
+        are here.</p>"""),
+
+    "narrative_ip": ("IP", """
+        <p>What is filed, what is granted, what is somebody else's. Include
+        dependencies on third-party applications and any licence you rely on.</p>
+        <p>Two uses: instruments that fund patenting and IP extension can only be
+        matched if the position is written down, and an assessor or an investor
+        will ask the freedom-to-operate question early.</p>"""),
+
+    "narrative_market": ("Market", """
+        <p>Who buys, how they buy, and how big that is. Segments, channel,
+        pricing if you have it, the geography you sell into now versus the one
+        you are aiming at.</p>
+        <p>Public instruments increasingly score commercial credibility, not just
+        technical merit — and the difference between a domestic and an export
+        ambition opens or closes a whole family of internationalisation
+        schemes.</p>"""),
+
+    "narrative_traction": ("Traction", """
+        <p>The evidence that this is working: field trials and their results,
+        pilots, letters of intent, first sales, partnerships, users.</p>
+        <p>Almost every application has a section that this text answers, and
+        keeping it current here means writing it once instead of reconstructing
+        it under deadline.</p>"""),
+
+    "narrative_track_record": ("Track record", """
+        <p>Prizes, programmes, accelerators, grants already won, academic
+        partners, the founders' credentials.</p>
+        <p>A great many calls score the applicant's history explicitly. This is
+        also how the fit score can tell you that you would be competitive for a
+        particular competition rather than merely eligible for it.</p>"""),
+
+    "narrative_strategy_12m": ("12-month strategy", """
+        <p>What the money is actually for, over the coming year. A pilot plant, a
+        hire, extending the IP, a regulatory step, a round, first revenue.</p>
+        <p><strong>This is the highest-value section in the profile.</strong>
+        Without it the search looks for funding in general; with it, it looks for
+        what you need now. A call that fits the company but funds something you
+        are not doing this year is a bad find, and only this section lets the
+        tool tell the difference.</p>"""),
+
+    "narrative_exclusions": ("Exclusions", """
+        <p>What you do <em>not</em> want, so it stops arriving. Anything you would
+        reject on sight, whatever its merits.</p>
+        <p>Typical entries: no equity below a certain valuation; nothing that
+        requires relocating or opening an office elsewhere; no scheme paid only
+        on reimbursement, given the runway; nothing that needs a paid consultant
+        to file; no defence or dual-use funders; nothing under a certain amount,
+        because the paperwork costs more than the money.</p>
+        <p>It is the cheapest section to fill and the one that most reduces
+        noise: an exclusion written here is a proposal that never reaches the
+        queue, rather than one you reject over and over.</p>"""),
+
     "funding_history": ("Funding history", """
         <p>Rounds and investments received. Whether a convertible has actually
         converted is a separate flag because several calls cap the equity raised
@@ -328,6 +399,56 @@ HELP: dict[str, tuple[str, str]] = {
         <p>It carries the investor branch, where there is no deadline to sort
         by and the only state that matters is the history of contact and the
         next step. Entries are append-only.</p>"""),
+
+    # --- aliases, so the generic profile forms can ask for help by field name
+
+    "kind": ("Kind of location", """
+        <p>What this address <em>is</em>, in the eyes of the company register: the
+        registered office, an operating unit, a laboratory, a production site.</p>
+        <p>Calls almost never ask for "a presence". They ask for a registered
+        office in the territory, or an operating unit, and those are different
+        filings with different consequences.</p>"""),
+
+    "regime": ("Aid regime", """
+        <p>Which state-aid rule this contribution was granted under. It decides
+        which ceiling it counts against — and whether it counts at all.</p>
+        <p><strong>de_minimis</strong> consumes the de minimis allowance.
+        <strong>block_exempted</strong> and <strong>notified</strong> have their
+        own, much higher limits and leave that allowance untouched.
+        <strong>market_terms</strong> means it was not aid: an investment made on
+        the same terms a private investor would accept.
+        <strong>unknown</strong> is the honest answer until someone reads the
+        award decision, and it is better than a guess.</p>"""),
+
+    "gge_amount": ("Gross grant equivalent", """
+        <p>The actual advantage the aid conferred, expressed as if it had been a
+        straight cash grant. For a non-repayable contribution or a cash prize it
+        equals the amount; for a subsidised loan or a guarantee it is only the
+        benefit component, computed against market rates.</p>
+        <p>This, not the headline figure, is what counts against a ceiling.</p>"""),
+
+    "granted_at": ("Date of award", """
+        <p>The date of the award decision — the decree, the letter, the
+        resolution — not the date the money arrived. The clock on a rolling
+        ceiling starts there, often a year before payment.</p>"""),
+
+    "converted": ("Converted", """
+        <p>Whether a convertible instrument has actually converted into equity.
+        Several calls cap the equity raised to date, and an unconverted note
+        usually sits outside that count — which is why this is its own flag
+        rather than a note.</p>"""),
+
+    "highest_degree": ("Highest degree", """
+        <p>Recorded because it is a hard condition in more places than you would
+        expect. The Italian innovative-startup status can be held on the strength
+        of the share of staff with a doctorate, and several calls score or
+        require research qualifications in the team.</p>"""),
+
+    "left_at": ("Left on", """
+        <p>Set this instead of deleting the person. A departure changes the
+        team-composition gates from the day it is recorded, but the track record
+        the company is judged on was built with them, and an application may
+        still need to name who did the work.</p>"""),
 
     "warm_intro": ("Warm introduction", """
         <p>Who can introduce you. For most funds a cold approach and an

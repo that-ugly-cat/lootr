@@ -594,5 +594,101 @@ with TestClient(app) as c:
     c.post("/profile/edit", data={"legal_name": "BeadRoots S.r.l.", "headcount": "3"})
     check("a profile edit makes every older verdict stale",
           any(s["id"] == call_id for s in stale_evaluations()))
+
+    print("\n== form widgets ==")
+    r = c.get("/profile/aid/1/edit")
+    check("aid regime is a closed select",
+          '<select name="regime">' in r.text and 'value="de_minimis"' in r.text
+          and 'value="market_terms"' in r.text)
+    check("regime does not offer a free text box", '<input name="regime"' not in r.text)
+    check("award date is a date input", 'type="date" name="granted_at"' in r.text)
+    check("gge is a number input", 'type="number" step="any" name="gge_amount"' in r.text)
+    check("currency is an input with suggestions",
+          'list="dl-aid-currency"' in r.text and '<option value="EUR">' in r.text)
+    check("edit fields carry their own help", 'hx-get="/help/regime"' in r.text)
+
+    r = c.get("/profile/team/1/edit")
+    check("degree is a closed select",
+          '<select name="highest_degree">' in r.text and 'value="phd"' in r.text)
+    check("founder is a yes/no with a not-recorded state",
+          '<select name="is_founder">' in r.text and ">not recorded<" in r.text)
+    check("the stored yes is preselected", 'value="1" selected' in r.text)
+
+    r = c.get("/profile/locations/1/edit")
+    check("location kind suggests but does not constrain",
+          'list="dl-locations-kind"' in r.text
+          and '<option value="registered_office">' in r.text)
+
+    r = c.get("/profile")
+    check("every profile section has a collapsed add form",
+          r.text.count('class="addrow"') == 5, str(r.text.count('class="addrow"')))
+    check("the add form uses the same widgets", '<select name="regime">' in r.text)
+    for section in ["pitch", "technology", "ip", "market", "traction",
+                    "track_record", "strategy_12m", "exclusions"]:
+        if f"/help/narrative_{section}" not in r.text:
+            check(f"narrative section {section} has its own help", False)
+    check("every narrative section has its own help",
+          all(f"/help/narrative_{s}" in r.text for s in
+              ["pitch", "technology", "ip", "market", "traction",
+               "track_record", "strategy_12m", "exclusions"]))
+
+    r = c.get("/products/new")
+    check("TRL is a 1-9 select", '<select name="trl">' in r.text and '>9<' in r.text)
+    check("regulatory framework suggests known regimes",
+          'list="dl-regframework"' in r.text)
+    r = c.get("/opportunities/new")
+    check("aid regime on the opportunity form is a select",
+          '<select name="aid_regime">' in r.text)
+    check("disbursement is a select",
+          '<select name="disbursement">' in r.text
+          and 'value="reimbursement_on_report"' in r.text)
+    check("currency on the opportunity form suggests codes",
+          'list="dl-o-currency"' in r.text)
+
+    r = c.get("/pipeline")
+    check("contacts can be created from the pipeline",
+          'action="/profile/contacts/new"' in r.text)
+    r = c.post("/profile/contacts/new", data={
+        "name": "M. Rossi", "organisation": "Eatable Adventures", "role": "Partner",
+        "relationship": "met", "opportunity_id": str(vc_id),
+        "warm_intro_via": "FoodSeed cohort", "back": "/pipeline"},
+        follow_redirects=False)
+    check("contact created", r.status_code == 303)
+    r = c.get("/pipeline")
+    check("contact listed with its opportunity",
+          "M. Rossi" in r.text and "Eatable Adventures" in r.text)
+    r = c.get(f"/opportunities/{vc_id}/detail")
+    check("contact shows on the opportunity too",
+          "M. Rossi" in r.text and "FoodSeed cohort" in r.text)
+
+    print("\n== a very long deadline does not break the table ==")
+    from app.routers.ui import _deadline_label
+    long_text = ("Nessuna scadenza: misura a sportello, le domande possono essere "
+                 "presentate fino a quando vi sono risorse finanziarie disponibili; "
+                 "non ci sono graduatorie.")
+    check("a date wins over everything",
+          _deadline_label({"deadline_date": "2026-10-15", "deadline_type": "fixed",
+                           "deadline_text": long_text}) == "2026-10-15")
+    check("the type speaks when there is no date",
+          _deadline_label({"deadline_type": "open_until_funds_exhausted",
+                           "deadline_text": long_text}) == "while funds last")
+    label = _deadline_label({"deadline_text": long_text})
+    check("a bare quotation is clipped", len(label) <= 43 and label.endswith("…"),
+          f"{len(label)} chars")
+    check("nothing at all reads as a dash", _deadline_label({}) == "—")
+
+    with get_db() as db:
+        db.execute("UPDATE opportunities SET deadline_date=NULL, "
+                   "deadline_type='open_until_funds_exhausted', deadline_text=? "
+                   "WHERE id=?", (long_text, call_id))
+    r = c.get("/calls")
+    check("the table shows the short label", "while funds last" in r.text)
+    check("the table does not carry the paragraph",
+          "non ci sono graduatorie" not in r.text.split("<title>")[0]
+          or r.text.count("non ci sono graduatorie") == 1)
+    check("the full wording is still reachable as a tooltip",
+          'title="Nessuna scadenza' in r.text)
+    r = c.get(f"/opportunities/{call_id}/detail")
+    check("the modal carries the full wording", "non ci sono graduatorie" in r.text)
 print("\n" + ("ALL GREEN" if not fails else f"{len(fails)} FAILURES: {fails}"))
 sys.exit(1 if fails else 0)

@@ -28,7 +28,8 @@
           <select name="status">
             {% for s in states %}<option value="{{ s }}" {% if a.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
           </select></label>
-        <label>Currency <input name="currency" value="{{ a.currency or '' }}"></label>
+        <label>Currency <input name="currency" value="{{ a.currency or '' }}" list="dl-currency" autocomplete="off">
+        <datalist id="dl-currency"><option value="EUR"><option value="USD"><option value="CHF"><option value="GBP"></datalist></label>
         <label>Amount requested <input name="amount_requested" value="{{ a.amount_requested or '' }}"></label>
         <label>Amount awarded <input name="amount_awarded" value="{{ a.amount_awarded or '' }}"></label>
         <label>Submitted <input type="date" name="submitted_at" value="{{ a.submitted_at or '' }}"></label>

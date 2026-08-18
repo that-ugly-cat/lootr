@@ -24,8 +24,9 @@
       </td></tr>
       {% endif %}
       <tr><th>Deadline {{ help('deadline_type') }}</th><td>
-        {{ o.deadline_date or o.deadline_text or '—' }}
-        {% if o.deadline_type %} <span class="chip">{{ o.deadline_type }}</span>{% endif %}
+        {{ o.deadline_date or '—' }}
+        {% if o.deadline_type %} <span class="chip">{{ o.deadline_type.replace('_', ' ') }}</span>{% endif %}
+        {% if o.deadline_text %}<br><span class="sub">“{{ o.deadline_text }}”</span>{% endif %}
         {% if o.recurrence_logic %}<br>{{ o.recurrence_logic }}{% endif %}
         {% if o.decision_lag_months %}<br>decision in ~{{ o.decision_lag_months }} months{% endif %}
       </td></tr>

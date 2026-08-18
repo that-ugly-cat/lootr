@@ -3,6 +3,19 @@
   <label class="{% if span %}span2{% endif %}">{{ label|safe }}
     <input type="{{ type }}" name="{{ name }}" value="{{ value if value is not none else '' }}"></label>
 {% endmacro %}
+{% macro sel(name, label, value, options) %}
+  <label>{{ label|safe }}
+    <select name="{{ name }}">
+      <option value="">—</option>
+      {% for o in options %}<option value="{{ o }}" {% if value == o %}selected{% endif %}>{{ o.replace('_', ' ') }}</option>{% endfor %}
+    </select></label>
+{% endmacro %}
+{% macro dl(name, label, value, options) %}
+  <label>{{ label|safe }}
+    <input name="{{ name }}" value="{{ value if value is not none else '' }}"
+           list="dl-o-{{ name }}" autocomplete="off">
+    <datalist id="dl-o-{{ name }}">{% for o in options %}<option value="{{ o }}">{% endfor %}</datalist></label>
+{% endmacro %}
 {% macro yesno(name, label, value) %}
   <label>{{ label|safe }}
     <select name="{{ name }}">
@@ -44,12 +57,14 @@
   <div class="grid2">
     {{ txt('amount_min', 'Amount min', o.amount_min) }}
     {{ txt('amount_max', 'Amount max', o.amount_max) }}
-    {{ txt('currency', 'Currency', o.currency) }}
+    {{ dl('currency', 'Currency', o.currency, ['EUR', 'USD', 'CHF', 'GBP']) }}
     {{ txt('funding_rate_pct', 'Funding rate %', o.funding_rate_pct) }}
     {{ txt('cofinancing_pct', 'Co-financing %', o.cofinancing_pct) }}
     {{ yesno('advance_available', 'Advance available', o.advance_available) }}
-    {{ txt('disbursement', 'Disbursement ' ~ help('disbursement'), o.disbursement) }}
-    {{ txt('aid_regime', 'Aid regime ' ~ help('aid_regime'), o.aid_regime) }}
+    {{ sel('disbursement', 'Disbursement ' ~ help('disbursement'), o.disbursement,
+            ['advance', 'milestones', 'reimbursement_on_report']) }}
+    {{ sel('aid_regime', 'Aid regime ' ~ help('aid_regime'), o.aid_regime,
+            ['de_minimis', 'block_exempted', 'notified', 'none']) }}
     {{ txt('call_total_budget', 'Total call budget', o.call_total_budget, span=true) }}
   </div>
 </div>
@@ -98,10 +113,12 @@
   <div class="grid2">
     {{ txt('ticket_min', 'Ticket min', o.ticket_min) }}
     {{ txt('ticket_max', 'Ticket max', o.ticket_max) }}
-    {{ txt('stage_focus', 'Stage focus', o.stage_focus) }}
+    {{ dl('stage_focus', 'Stage focus', o.stage_focus,
+           ['pre-seed', 'seed', 'series A', 'series B', 'growth']) }}
     {{ txt('sector_focus', 'Sector focus', o.sector_focus) }}
     {{ txt('geo_focus', 'Geography focus', o.geo_focus) }}
-    {{ txt('lead_or_follow', 'Lead or follow', o.lead_or_follow) }}
+    {{ dl('lead_or_follow', 'Lead or follow', o.lead_or_follow,
+           ['lead', 'follow', 'either']) }}
   </div>
 </div>
 
@@ -122,7 +139,7 @@
         {% for e in ['', 'low', 'medium', 'high', 'needs_consultant'] %}
           <option value="{{ e }}" {% if o.effort == e %}selected{% endif %}>{{ e or '—' }}</option>{% endfor %}
       </select></label>
-    {{ txt('priority', 'Priority', o.priority) }}
+    {{ dl('priority', 'Priority', o.priority, ['high', 'medium', 'low']) }}
     <label>Best-fit product
       <select name="best_fit_product_id">
         <option value="">—</option>

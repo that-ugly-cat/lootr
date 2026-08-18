@@ -66,8 +66,10 @@
     <div class="grid2">
       <label>Name <input name="name" required></label>
       <label>URL <input name="url"></label>
-      <label>Geography <input name="geo_hint" placeholder="IT · Puglia · EU"></label>
-      <label>Instruments <input name="instrument_hint" placeholder="grant · prize · vc"></label>
+      <label>Geography <input name="geo_hint" list="dl-geohint" autocomplete="off" placeholder="IT · Puglia · EU">
+        <datalist id="dl-geohint"><option value="IT"><option value="EU"><option value="IT-Puglia"><option value="IT-Lombardia"><option value="IT-Veneto"><option value="IT-Mezzogiorno"></datalist></label>
+      <label>Instruments <input name="instrument_hint" list="dl-insthint" autocomplete="off" placeholder="grant · prize · vc">
+        <datalist id="dl-insthint"><option value="grant"><option value="subsidized_loan"><option value="prize"><option value="voucher"><option value="programme"><option value="vc"><option value="angel"><option value="hiring_support"></datalist></label>
       <label>Cadence {{ help('scan_cadence') }}
         <select name="scan_cadence">
           {% for c in ['', 'weekly', 'monthly', 'quarterly'] %}<option value="{{ c }}">{{ c or 'default' }}</option>{% endfor %}
