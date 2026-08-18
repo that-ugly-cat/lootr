@@ -813,6 +813,40 @@ with TestClient(app) as c:
           "getElementById('help-modal')" in h.text
           and "getElementById('modal')" not in h.text)
 
+    print("\n== what is running ==")
+    from app import jobs
+    jobs.clear()
+    check("nothing running renders no toast at all", c.get("/running").text.strip() == "")
+    with jobs.track("scan", "Scanning sources"):
+        jobs.progress("scan", "Invitalia (1 of 6)")
+        r = c.get("/running")
+        check("a running job shows on every page",
+              "Scanning sources" in r.text and "Invitalia (1 of 6)" in r.text)
+        check("and says how long it has been going", "0m" in r.text)
+        check("the toast is polled from the layout, not one page",
+              'hx-get="/running"' in c.get("/profile").text)
+    r = c.get("/running")
+    check("a finished job says so, briefly", "finished" in r.text)
+    with jobs.track("links", "Checking links"):
+        jobs.summarize("links", "12 links checked · 1 flagged")
+    check("a finish that left something to decide points at the queue",
+          'href="/proposals"' in c.get("/running").text)
+    # The failure case is the one that would leave the toast lying forever.
+    try:
+        with jobs.track("scan", "Scanning sources"):
+            raise RuntimeError("the source exploded")
+    except RuntimeError:
+        pass
+    check("a job that raises stops being reported as running",
+          not jobs.snapshot()["running"])
+    check("and is reported as failed rather than done",
+          jobs.snapshot()["finished"]["outcome"] == "failed")
+    jobs.clear()
+    check("the registry empties with the process, which is the point",
+          jobs.snapshot() == {"running": [], "finished": None})
+    check("the toast needs a session like everything else",
+          TestClient(app).get("/running").status_code == 401)
+
     print("\n== the guide ==")
     check("the guide is gated like everything else",
           TestClient(app).get("/guide").status_code == 401)

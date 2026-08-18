@@ -1,0 +1,19 @@
+{# Rendered only when something is running or has just finished: the route
+   returns an empty body otherwise, so there is no toast to dismiss and nothing
+   to ignore on a quiet day. #}
+{% for job in running %}
+<div class="toast">
+  <span class="toast-spin" aria-hidden="true"></span>
+  <span><strong>{{ job.label }}</strong>{% if job.detail %} · {{ job.detail }}{% endif %}
+    <span class="sub">· {{ job.seconds // 60 }}m {{ job.seconds % 60 }}s</span></span>
+</div>
+{% endfor %}
+{% if finished and not running %}
+<div class="toast toast-done">
+  <span><strong>{{ finished.label }}</strong> finished{% if finished.detail %} · {{ finished.detail }}{% endif %}</span>
+  {# Both words mean the same thing for the reader: something is waiting to be
+     decided. A flag from the link monitor is a proposal like any other. #}
+  {% if 'proposal' in (finished.detail or '') or 'flagged' in (finished.detail or '') %}
+    <a href="/proposals">open the queue</a>{% endif %}
+</div>
+{% endif %}

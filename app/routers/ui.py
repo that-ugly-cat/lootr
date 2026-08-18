@@ -14,6 +14,7 @@ from markupsafe import Markup
 from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
                     new_api_key, require_admin, require_editor, require_user,
                     verify_password)
+from .. import jobs
 from ..db import (CONDITION_TIMING, OPPORTUNITY_FIELDS, TAG_NAMESPACES,
                   company_profile, get_config, get_db, json_field,
                   remember_tags, status_condition)
@@ -377,6 +378,20 @@ def _tag_options(record: dict) -> dict:
     return options
 
 
+# --- what is running --------------------------------------------------------
+
+@router.get("/running", response_class=HTMLResponse)
+def running_toast(request: Request, user=Depends(require_user)):
+    """The toast, polled from every page. Empty when nothing is happening, which
+    is most of the time — an empty response renders no toast at all."""
+    state = jobs.snapshot()
+    if not state["running"] and not state["finished"]:
+        return HTMLResponse("")
+    return templates.TemplateResponse(request, "_toast.html",
+                                      {"running": state["running"],
+                                       "finished": state["finished"]})
+
+
 # --- the guide --------------------------------------------------------------
 
 GUIDE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "guide.md")
@@ -697,15 +712,55 @@ async def opportunity_update(request: Request, opportunity_id: int,
 # page comes straight back. Results land in the queue, the scan log, or the
 # record itself, and the next page load shows them.
 
-def _background(fn, *args) -> None:
-    threading.Thread(target=fn, args=args, daemon=True).start()
+def _job_summary(result) -> str:
+    """One line about what a job produced, from whatever it returned. Written
+    against the shapes the jobs actually return rather than a common interface:
+    there are four of them and they are unlikely to become forty."""
+    if isinstance(result, list):
+        stored = sum(r.get("stored", 0) for r in result if isinstance(r, dict))
+        errors = sum(1 for r in result if isinstance(r, dict) and r.get("outcome") == "error")
+        parts = [f"{len(result)} done"]
+        if stored:
+            parts.append(f"{stored} proposal{'' if stored == 1 else 's'} in the queue")
+        if errors:
+            parts.append(f"{errors} failed")
+        return " · ".join(parts)
+    if isinstance(result, dict):
+        if "checked" in result:  # the link monitor
+            flagged = result.get("dead", 0) + result.get("changed", 0)
+            return (f"{result['checked']} links checked"
+                    + (f" · {flagged} flagged" if flagged else " · nothing moved"))
+        bits = [str(result.get("outcome", "done"))]
+        if result.get("changes"):
+            bits.append(f"{result['changes']} difference"
+                        f"{'' if result['changes'] == 1 else 's'} proposed")
+        return " · ".join(bits)
+    return ""
+
+
+def _background(fn, *args, key: str = "", label: str = "") -> None:
+    """Run a long job off the request, and let every page know it is running.
+
+    The key doubles as an identity: a second scan started while one is running
+    replaces the first one's entry rather than adding a line to the toast.
+    """
+    key = key or fn.__name__
+    label = label or key.replace("_", " ")
+
+    def run():
+        with jobs.track(key, label):
+            result = fn(*args)
+            jobs.summarize(key, _job_summary(result))
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 @router.post("/opportunities/{opportunity_id}/check")
 def opportunity_check(opportunity_id: int, view: str = Form("calls"),
                       user=Depends(require_editor)):
     """Verifier: does the stored record still match the page?"""
-    _background(verify_opportunity, opportunity_id)
+    _background(verify_opportunity, opportunity_id,
+                key="verify", label="Verifying a record")
     return RedirectResponse(f"/opportunities?view={view}&started=check", status_code=303)
 
 
@@ -713,25 +768,29 @@ def opportunity_check(opportunity_id: int, view: str = Form("calls"),
 def opportunity_evaluate(opportunity_id: int, view: str = Form("calls"),
                          user=Depends(require_editor)):
     """Evaluator: eligibility, caps and fit against the current profile."""
-    _background(evaluate_opportunity, opportunity_id)
+    _background(evaluate_opportunity, opportunity_id,
+                key="evaluate", label="Evaluating against the profile")
     return RedirectResponse(f"/opportunities?view={view}&started=evaluate", status_code=303)
 
 
 @router.post("/evaluate-stale")
 def evaluate_stale(user=Depends(require_editor)):
-    _background(run_evaluations, True)
+    _background(run_evaluations, True,
+                key="evaluate", label="Evaluating the stale rows")
     return RedirectResponse("/calls?started=evaluate", status_code=303)
 
 
 @router.post("/scan-now")
 def scan_now(source_id: int | None = Form(None), user=Depends(require_editor)):
-    _background(run_scan, source_id)
+    _background(run_scan, source_id,
+                key="scan", label="Scanning sources")
     return RedirectResponse("/sources?started=scan", status_code=303)
 
 
 @router.post("/check-links-now")
 def check_links_now(user=Depends(require_editor)):
-    _background(run_link_monitor)
+    _background(run_link_monitor,
+                key="links", label="Checking links")
     return RedirectResponse("/sources?started=links", status_code=303)
 
 

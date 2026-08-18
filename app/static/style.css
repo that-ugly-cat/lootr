@@ -224,6 +224,28 @@ code.key {
    tab styles it replaces are gone: two pages became one. */
 .view-filter { font-weight: 600; border-color: var(--accent-dim); }
 
+/* Work in progress, bottom right of every page. Deliberately quiet: it reports,
+   it does not interrupt, and it never asks to be dismissed — it goes when the
+   work goes. */
+#toast-slot { position: fixed; right: 1.2rem; bottom: 1.2rem; z-index: 40;
+              display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end; }
+.toast {
+  display: flex; align-items: center; gap: 0.6rem;
+  background: var(--card); border: 1px solid var(--border-hi); border-radius: 8px;
+  padding: 0.5rem 0.9rem; font-size: 0.8rem; color: var(--label);
+  box-shadow: 0 6px 20px rgba(5, 7, 12, 0.5); max-width: 26rem;
+}
+.toast strong { color: var(--fg); font-weight: 700; }
+.toast a { margin-left: 0.2rem; white-space: nowrap; }
+.toast-done { border-color: var(--ok); }
+.toast-spin {
+  width: 0.7rem; height: 0.7rem; flex: none; border-radius: 50%;
+  border: 2px solid var(--accent-dim); border-top-color: var(--accent);
+  animation: toast-spin 0.9s linear infinite;
+}
+@keyframes toast-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .toast-spin { animation: none; } }
+
 /* the guide: prose, with its contents alongside */
 .guide-layout { display: grid; grid-template-columns: 14rem 1fr; gap: 2.5rem; align-items: start; }
 .guide-toc {

@@ -16,6 +16,7 @@ from datetime import date
 
 import anthropic
 
+from .. import jobs
 from ..db import OPPORTUNITY_FIELDS, get_db, get_config, opportunities_digest
 from .profile_context import profile_block
 
@@ -349,7 +350,10 @@ def run_scan(source_id: int | None = None, only_due: bool = False) -> list[dict]
                        db.execute("SELECT * FROM sources WHERE enabled=1")]
 
     results = []
-    for source in sources:
+    for n, source in enumerate(sources, start=1):
+        # Which source, out of how many: on a nightly run of six this is the
+        # difference between "something is happening" and knowing how long is left.
+        jobs.progress("scan", f"{source['name']} ({n} of {len(sources)})")
         with get_db() as db:
             log_id = db.execute("INSERT INTO scan_log (source_id) VALUES (?)",
                                 (source["id"],)).lastrowid

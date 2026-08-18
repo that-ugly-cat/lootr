@@ -38,6 +38,11 @@
 <main>
 {% block content %}{% endblock %}
 </main>
+{% if user %}
+{# Polled from every page: a scan takes minutes and the banner you land on is
+   lost the moment you navigate. Empty response, no toast. #}
+<div id="toast-slot" hx-get="/running" hx-trigger="load, every 15s" hx-swap="innerHTML"></div>
+{% endif %}
 <div id="modal"></div>
 {# Second layer, so an explanation opens on top of what you were reading
    instead of in place of it. #}

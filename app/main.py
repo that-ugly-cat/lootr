@@ -18,6 +18,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import jobs
 from .auth import bootstrap_admin, check_api_key
 from .db import company_profile, init_db
 from .discovery.evaluator import run_evaluations
@@ -28,6 +29,19 @@ from .routers import api, ui
 from .version import commit_hash
 
 scheduler = BackgroundScheduler(timezone="Europe/Rome")
+
+
+def _tracked(key: str, label: str, fn):
+    """Wrap a nightly job so the UI can say it is running.
+
+    The scheduler runs in this process, so the same registry the buttons use
+    covers it. Without this the nightly work would be the one thing nobody could
+    see: it happens while nobody is watching, and by morning the only trace is a
+    queue that grew for no visible reason."""
+    def run():
+        with jobs.track(key, label):
+            fn()
+    return run
 
 
 def _scheduled_scan():
@@ -41,13 +55,16 @@ async def lifespan(app: FastAPI):
     init_db()
     bootstrap_admin()
     if os.environ.get("LOOTR_SCHEDULER", "1") == "1":
-        scheduler.add_job(run_link_monitor, CronTrigger(hour=3, minute=0),
-                          id="link_monitor")
-        scheduler.add_job(_scheduled_scan, CronTrigger(hour=4, minute=0), id="llm_scan")
+        scheduler.add_job(_tracked("links", "Checking links", run_link_monitor),
+                          CronTrigger(hour=3, minute=0), id="link_monitor")
+        scheduler.add_job(_tracked("scan", "Scanning sources", _scheduled_scan),
+                          CronTrigger(hour=4, minute=0), id="llm_scan")
         # Newly approved rows have no verdict yet, and a profile edit makes every
         # older verdict provisional. Both are picked up here.
-        scheduler.add_job(lambda: run_evaluations(stale_only=True),
-                          CronTrigger(hour=5, minute=0), id="evaluator")
+        scheduler.add_job(
+            _tracked("evaluate", "Evaluating the stale rows",
+                     lambda: run_evaluations(stale_only=True)),
+            CronTrigger(hour=5, minute=0), id="evaluator")
         scheduler.start()
     async with mcp.session_manager.run():
         yield
