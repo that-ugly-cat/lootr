@@ -37,7 +37,7 @@ with TestClient(app) as c:
     print("\n== public ==")
     check("landing 200", c.get("/").status_code == 200)
     check("login page 200", c.get("/login").status_code == 200)
-    check("calls gated", c.get("/calls").status_code == 401)
+    check("opportunities gated", c.get("/opportunities").status_code == 401)
     check("profile gated", c.get("/profile").status_code == 401)
     check("health", c.get("/health").json()["status"] == "ok")
 
@@ -46,7 +46,8 @@ with TestClient(app) as c:
     check("bad password 401", bad.status_code == 401)
     r = c.post("/login", data={"username": "spit", "password": "test-password-123"},
                follow_redirects=False)
-    check("login redirects to /calls", r.status_code == 303 and r.headers["location"] == "/calls")
+    check("login redirects to the opportunities table",
+          r.status_code == 303 and r.headers["location"] == "/opportunities")
     check("session cookie set", "lootr_session" in c.cookies)
 
     print("\n== company profile ==")
@@ -145,18 +146,31 @@ with TestClient(app) as c:
     call_id = rows["Smart&Start Italia"]["id"]
     vc_id = rows["Eatable Adventures"]["id"]
 
-    r = c.get("/calls")
+    # One table, three readings. Unfiltered shows both kinds — that is the point
+    # of the merge; the two filters still narrow to one kind each.
+    r = c.get("/opportunities")
+    check("unfiltered, the table shows calls and investors together",
+          "Smart&amp;Start" in r.text and "Eatable Adventures" in r.text)
+    check("the combined view answers one question per column",
+          ">Amount" in r.text and ">Next date<" in r.text)
+    r = c.get("/opportunities?view=calls")
     check("calls view shows the loan", "Smart&amp;Start" in r.text)
     check("calls view hides the VC", "Eatable Adventures" not in r.text)
-    r = c.get("/investors")
+    r = c.get("/opportunities?view=investors")
     check("investors view shows the VC", "Eatable Adventures" in r.text)
     check("investors view hides the loan", "Smart&amp;Start" not in r.text)
+    check("an unknown view falls back to the whole table rather than erroring",
+          "Eatable Adventures" in c.get("/opportunities?view=nonsense").text)
+    r = c.get("/calls", follow_redirects=False)
+    check("the old address still works, as a redirect",
+          r.status_code == 307 and "view=calls" in r.headers["location"])
+    check("investors view hides the loan", "Smart&amp;Start" not in r.text)
 
-    r = c.get("/calls", headers={"HX-Request": "true"})
+    r = c.get("/opportunities?view=calls", headers={"HX-Request": "true"})
     check("htmx partial has no header", r.status_code == 200 and "<nav>" not in r.text)
-    r = c.get("/calls?q=smart&instrument=subsidized_loan&status=open")
+    r = c.get("/opportunities?view=calls&q=smart&instrument=subsidized_loan&status=open")
     check("combined filters keep the row", "Smart&amp;Start" in r.text)
-    r = c.get("/calls?q=nothingmatches")
+    r = c.get("/opportunities?view=calls&q=nothingmatches")
     check("filter can empty the table", "Nothing here yet" in r.text)
 
     r = c.get(f"/opportunities/{call_id}/detail")
@@ -179,7 +193,7 @@ with TestClient(app) as c:
     r = c.get(f"/opportunities/{call_id}/detail")
     check("cap shown with verbatim scope", "excluding grants" in r.text)
     check("both product verdicts shown", "TRL 7 sits inside" in r.text and "below the floor" in r.text)
-    r = c.get("/calls")
+    r = c.get("/opportunities")
     check("fit score in table", "82" in r.text)
 
     print("\n== pipeline ==")
@@ -196,7 +210,7 @@ with TestClient(app) as c:
     r = c.get("/pipeline")
     check("pipeline shows the action", "Send updated deck" in r.text)
     check("pipeline shows the diary", "Intro call" in r.text)
-    r = c.get("/investors")
+    r = c.get("/opportunities?view=investors")
     check("investors view sorts on next action", "Send updated deck" in r.text)
 
     r = c.post("/pipeline/new", data={
@@ -290,7 +304,7 @@ with TestClient(app) as c:
     admin_cookie = dict(c.cookies)
     c.cookies.clear()
     c.post("/login", data={"username": "reader", "password": "reader-password"})
-    check("reader can read", c.get("/calls").status_code == 200)
+    check("reader can read", c.get("/opportunities").status_code == 200)
     check("reader cannot edit", c.post("/products/new", data={"name": "x"}).status_code == 403)
     check("reader cannot reach admin", c.get("/admin").status_code == 403)
     c.cookies.clear()
@@ -428,7 +442,7 @@ with TestClient(app) as c:
     check(f"all {len(HELP)} help entries render", not broken, str(broken))
     check("unknown help key renders nothing", c.get("/help/nope").text == "")
     check("help is gated", TestClient(app).get("/help/de_minimis").status_code == 401)
-    thin = [path for path in ["/calls", "/investors", "/profile", "/products",
+    thin = [path for path in ["/opportunities", "/profile", "/products",
                               "/pipeline", "/proposals", "/sources", "/admin",
                               "/opportunities/new"]
             if 'class="help"' not in c.get(path).text]
@@ -734,10 +748,10 @@ with TestClient(app) as c:
     check("an empty model falls back to the default rather than to nothing",
           scan_model() == "claude-opus-5", scan_model())
 
-    check("the header shows the company", "BeadRoots" in c.get("/calls").text)
+    check("the header shows the company", "BeadRoots" in c.get("/opportunities").text)
     c.post("/admin/config/company_display_name", data={"value": "BeadRoots (dev)"})
     check("the display name overrides the legal name",
-          "BeadRoots (dev)" in c.get("/calls").text)
+          "BeadRoots (dev)" in c.get("/opportunities").text)
     c.post("/admin/config/company_display_name", data={"value": ""})
 
     # Every field on the opportunity form explains itself. Asserted rather than
@@ -869,7 +883,7 @@ with TestClient(app) as c:
         db.execute("UPDATE opportunities SET deadline_date=NULL, "
                    "deadline_type='open_until_funds_exhausted', deadline_text=? "
                    "WHERE id=?", (long_text, call_id))
-    r = c.get("/calls")
+    r = c.get("/opportunities")
     check("the table shows the short label", "while funds last" in r.text)
     check("the table does not carry the paragraph",
           "non ci sono graduatorie" not in r.text.split("<title>")[0]

@@ -17,14 +17,17 @@
 </div>
 {% endif %}
 
-<div class="tabs">
-  <a href="/calls" class="{% if view == 'calls' %}on{% endif %}">Calls</a>
-  <a href="/investors" class="{% if view == 'investors' %}on{% endif %}">Investors</a>
-  <span class="tabs-help">{{ help('calls_vs_investors') }}</span>
-</div>
-
 <div class="toolbar">
-  <form class="filters" hx-get="/{{ view }}" hx-target="#table" hx-trigger="change, keyup delay:350ms from:input[name='q']">
+  <form class="filters" hx-get="/opportunities" hx-target="#table" hx-trigger="change, keyup delay:350ms from:input[name='q']">
+    {# Calls and investors are a filter on one table, not two pages: the
+       distinction is a property of the rows, and navigating on it meant every
+       look at the funding picture was half a look. #}
+    <select name="view" class="view-filter">
+      <option value="all" {% if view == 'all' %}selected{% endif %}>calls and investors</option>
+      <option value="calls" {% if view == 'calls' %}selected{% endif %}>calls only</option>
+      <option value="investors" {% if view == 'investors' %}selected{% endif %}>investors only</option>
+    </select>
+    {{ help('calls_vs_investors') }}
     <input type="search" name="q" value="{{ q }}" placeholder="search…">
     <select name="instrument">
       <option value="">any instrument</option>

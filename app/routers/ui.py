@@ -416,7 +416,7 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
             {"error": "Invalid credentials", "user": None, "pending_count": 0},
             status_code=401)
     token = make_token(row["id"], row["username"], row["role"])
-    resp = RedirectResponse("/calls", status_code=303)
+    resp = RedirectResponse("/opportunities", status_code=303)
     resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax", max_age=3600 * 24 * 30)
     return resp
 
@@ -430,14 +430,29 @@ def logout():
 
 # --- opportunities ----------------------------------------------------------
 
+OPPORTUNITY_VIEWS = ["all", "calls", "investors"]
+
+
 def _view_condition(view: str, p: str = "o.") -> str:
-    """Calls and Investors are two readings of one table. Investors have no
-    deadline to sort by, only a next action."""
+    """Calls and Investors are two readings of one table, and `all` is the table
+    itself. Investors have no deadline to sort by, only a next action."""
     if view == "investors":
         return (f" AND ({p}instrument IN {EQUITY_INSTRUMENTS} "
                 f"OR {p}provider_type IN {EQUITY_PROVIDERS})")
-    return (f" AND {p}instrument NOT IN {EQUITY_INSTRUMENTS} "
-            f"AND ({p}provider_type IS NULL OR {p}provider_type NOT IN {EQUITY_PROVIDERS})")
+    if view == "calls":
+        return (f" AND {p}instrument NOT IN {EQUITY_INSTRUMENTS} "
+                f"AND ({p}provider_type IS NULL OR {p}provider_type NOT IN {EQUITY_PROVIDERS})")
+    return ""
+
+
+def _is_investor(o) -> bool:
+    """The same rule as the SQL above, per row — the combined view needs it to
+    decide whether a row is showing a ticket or an amount."""
+    return (o.get("instrument") in EQUITY_INSTRUMENTS
+            or o.get("provider_type") in EQUITY_PROVIDERS)
+
+
+templates.env.globals["is_investor"] = _is_investor
 
 
 def _query_opportunities(view, q, instrument, provider_type, source, status):
@@ -469,9 +484,16 @@ def _query_opportunities(view, q, instrument, provider_type, source, status):
     cond, cond_args = status_condition(status, prefix="o.")
     sql += cond
     args += cond_args
-    sql += (" ORDER BY a.next_action_due IS NULL, a.next_action_due"
-            if view == "investors" else
-            " ORDER BY o.deadline_date IS NULL, o.deadline_date")
+    # Each view sorts by the clock it actually has. Combined, the honest reading
+    # is "whatever happens next": a deadline for a call, a next action for an
+    # investor, and rows with neither at the bottom.
+    if view == "investors":
+        sql += " ORDER BY a.next_action_due IS NULL, a.next_action_due"
+    elif view == "calls":
+        sql += " ORDER BY o.deadline_date IS NULL, o.deadline_date"
+    else:
+        sql += (" ORDER BY COALESCE(o.deadline_date, a.next_action_due) IS NULL, "
+                "COALESCE(o.deadline_date, a.next_action_due)")
     # The dropdowns list only what exists *in this view*: offering "equity" as a
     # filter under Calls would just be a way to get an empty table.
     scope = _view_condition(view, p="")
@@ -503,16 +525,30 @@ def _opportunities_page(request: Request, view: str, q: str, instrument: str,
     return _render(request, "opportunities.html", **ctx)
 
 
-@router.get("/calls", response_class=HTMLResponse)
-def calls_page(request: Request, q: str = "", instrument: str = "", provider_type: str = "",
-               source: str = "", status: str = "open", user=Depends(require_user)):
-    return _opportunities_page(request, "calls", q, instrument, provider_type, source, status)
+@router.get("/opportunities", response_class=HTMLResponse)
+def opportunities_page(request: Request, view: str = "all", q: str = "", instrument: str = "",
+                       provider_type: str = "", source: str = "", status: str = "open",
+                       user=Depends(require_user)):
+    """One table. Calls and Investors are a filter on it, not two pages: the
+    distinction is real — one has deadlines, the other has next actions — but it
+    is a property of the rows, and splitting the navigation on it meant every
+    look at the funding picture was half a look."""
+    if view not in OPPORTUNITY_VIEWS:
+        view = "all"
+    return _opportunities_page(request, view, q, instrument, provider_type, source, status)
 
 
-@router.get("/investors", response_class=HTMLResponse)
-def investors_page(request: Request, q: str = "", instrument: str = "", provider_type: str = "",
-                   source: str = "", status: str = "open", user=Depends(require_user)):
-    return _opportunities_page(request, "investors", q, instrument, provider_type, source, status)
+# The old addresses stay, as redirects: they are in bookmarks, in the wiki, and
+# in half a session's worth of links.
+@router.get("/calls")
+def calls_page(request: Request):
+    return RedirectResponse(f"/opportunities?view=calls&{request.url.query}", status_code=307)
+
+
+@router.get("/investors")
+def investors_page(request: Request):
+    return RedirectResponse(f"/opportunities?view=investors&{request.url.query}",
+                            status_code=307)
 
 
 def _all_sources() -> list[dict]:
@@ -556,7 +592,7 @@ async def opportunity_create(request: Request, user=Depends(require_editor)):
         db.execute(
             f"INSERT INTO opportunities ({', '.join(cols)}) "
             f"VALUES ({', '.join('?' * len(vals))})", vals)
-    return RedirectResponse(f"/{form.get('view') or 'calls'}", status_code=303)
+    return RedirectResponse(f"/opportunities?view={form.get('view') or 'all'}", status_code=303)
 
 
 @router.get("/opportunities/{opportunity_id}/detail", response_class=HTMLResponse)
@@ -602,7 +638,7 @@ def opportunity_edit(request: Request, opportunity_id: int, view: str = "calls",
     with get_db() as db:
         row = db.execute("SELECT * FROM opportunities WHERE id=?", (opportunity_id,)).fetchone()
     if not row:
-        return RedirectResponse("/calls", status_code=303)
+        return RedirectResponse("/opportunities", status_code=303)
     opportunity = dict(row)
     return _render(request, "opportunity_form.html", o=opportunity, view=view,
                    action=f"/opportunities/{opportunity_id}/edit", instruments=INSTRUMENTS,
@@ -626,7 +662,7 @@ async def opportunity_update(request: Request, opportunity_id: int,
                 _form_int(form, "source_id"), form.get("status") or "watching",
                 form.get("priority") or None, form.get("effort") or None,
                 _form_int(form, "best_fit_product_id"), opportunity_id])
-    return RedirectResponse(f"/{form.get('view') or 'calls'}", status_code=303)
+    return RedirectResponse(f"/opportunities?view={form.get('view') or 'all'}", status_code=303)
 
 
 # --- discovery, on demand -----------------------------------------------------
@@ -643,7 +679,7 @@ def opportunity_check(opportunity_id: int, view: str = Form("calls"),
                       user=Depends(require_editor)):
     """Verifier: does the stored record still match the page?"""
     _background(verify_opportunity, opportunity_id)
-    return RedirectResponse(f"/{view}?started=check", status_code=303)
+    return RedirectResponse(f"/opportunities?view={view}&started=check", status_code=303)
 
 
 @router.post("/opportunities/{opportunity_id}/evaluate")
@@ -651,7 +687,7 @@ def opportunity_evaluate(opportunity_id: int, view: str = Form("calls"),
                          user=Depends(require_editor)):
     """Evaluator: eligibility, caps and fit against the current profile."""
     _background(evaluate_opportunity, opportunity_id)
-    return RedirectResponse(f"/{view}?started=evaluate", status_code=303)
+    return RedirectResponse(f"/opportunities?view={view}&started=evaluate", status_code=303)
 
 
 @router.post("/evaluate-stale")
@@ -678,7 +714,7 @@ def opportunity_delete(opportunity_id: int, view: str = Form("calls"),
     with get_db() as db:
         db.execute("DELETE FROM proposals WHERE opportunity_id=?", (opportunity_id,))
         db.execute("DELETE FROM opportunities WHERE id=?", (opportunity_id,))
-    return RedirectResponse(f"/{view}", status_code=303)
+    return RedirectResponse(f"/opportunities?view={view}", status_code=303)
 
 
 # --- company profile --------------------------------------------------------

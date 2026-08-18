@@ -5,8 +5,15 @@
       <th>Instrument</th>
       {% if view == 'investors' %}
         <th>Ticket</th><th>Stage</th><th>Next action {{ help('activities') }}</th>
-      {% else %}
+      {% elif view == 'calls' %}
         <th>Amount</th><th>Deadline {{ help('deadline_type') }}</th><th>Fit {{ help('fit_score') }}</th>
+      {% else %}
+        {# Combined: one column per question, answered from whichever field the
+           row actually has. Stage focus is investor-only and lives in the
+           modal — a column that is empty on most rows is not a column. #}
+        <th>Amount {{ help('calls_vs_investors') }}</th>
+        <th>Next date</th>
+        <th>Fit {{ help('fit_score') }}</th>
       {% endif %}
       <th>Status {{ help('status') }}</th>
     </tr>
@@ -22,6 +29,7 @@
       </td>
       <td class="nowrap"><span class="chip">{{ o.instrument or '—' }}</span></td>
 
+      {% set inv = view == 'investors' or (view == 'all' and is_investor(o)) %}
       {% if view == 'investors' %}
         <td class="nowrap">
           {%- if o.ticket_min or o.ticket_max -%}
@@ -31,6 +39,26 @@
         <td class="sub">{{ o.stage_focus or '—' }}</td>
         <td class="nowrap {% if o.next_action_due and o.next_action_due <= today %}due-soon{% endif %}">
           {% if o.next_action %}{{ o.next_action }}<br><span class="sub">{{ o.next_action_due or 'no date' }}</span>{% else %}—{% endif %}
+        </td>
+      {% elif inv %}
+        {# An investor row in the combined view: a ticket instead of an amount,
+           a next action instead of a deadline. Same columns, other clock. #}
+        <td class="nowrap">
+          {%- if o.ticket_min or o.ticket_max -%}
+            {{ o.ticket_min|money }}–{{ o.ticket_max|money }} {{ o.currency or '' }}
+          {%- else -%}—{%- endif -%}
+        </td>
+        <td class="nowrap {% if o.next_action_due and o.next_action_due <= today %}due-soon{% endif %}">
+          {% if o.next_action %}{{ o.next_action }}<br><span class="sub">{{ o.next_action_due or 'next action' }}</span>
+          {% else %}<span class="sub">no next action</span>{% endif %}
+        </td>
+        <td>
+          {% if o.fit_score is not none %}
+            <span class="fit {% if o.fit_score >= 70 %}fit-hi{% elif o.fit_score < 40 %}fit-lo{% endif %}">
+              <span class="fit-bar"><i style="width: {{ o.fit_score }}%"></i></span>
+              <span>{{ o.fit_score }}</span>
+            </span>
+          {% else %}<span class="sub">not evaluated</span>{% endif %}
         </td>
       {% else %}
         <td class="nowrap">

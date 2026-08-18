@@ -219,14 +219,10 @@ code.key {
 
 /* --- Lootr additions ---------------------------------------------------- */
 
-/* view tabs: Calls and Investors are two readings of one table */
-.tabs { display: flex; gap: 0.4rem; margin-bottom: 0.6rem; }
-.tabs a {
-  font-size: 0.8rem; font-weight: 700; text-decoration: none; color: var(--muted);
-  padding: 0.3rem 0.9rem; border: 1px solid var(--border); border-radius: 6px;
-}
-.tabs a:hover { color: var(--accent); }
-.tabs a.on { background: var(--card); color: var(--accent); border-color: var(--border-hi); }
+/* The calls/investors filter. Marked out from the other filters because it is
+   the one that changes what the columns mean, not just which rows show. The
+   tab styles it replaces are gone: two pages became one. */
+.view-filter { font-weight: 600; border-color: var(--accent-dim); }
 
 /* fit score */
 .fit { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
@@ -289,7 +285,6 @@ th .help { border-color: #23273a; }
 .help-body strong { color: var(--fg); }
 .help-body em { color: var(--warn); font-style: normal; }
 .help-body code { color: var(--accent); }
-.tabs-help { display: flex; align-items: center; }
 
 /* checkbox on its own line, and roomier multi-selects */
 .checkline { display: flex; align-items: center; gap: 0.5rem; }

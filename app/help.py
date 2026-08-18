@@ -45,13 +45,19 @@ HELP: dict[str, tuple[str, str]] = {
         call a year. Competitions and accelerator batches move faster and open
         windows that can be two weeks wide, so they deserve weekly.</p>"""),
 
-    "calls_vs_investors": ("Calls and Investors", """
-        <p>Two readings of the same table.</p>
+    "calls_vs_investors": ("Calls and investors", """
+        <p>One table, two kinds of row, and a filter between them.</p>
         <p><strong>Calls</strong> is everything with a deadline logic: grants,
-        prizes, subsidised loans, programmes. Sorted by the next date.</p>
-        <p><strong>Investors</strong> is equity and convertibles, where there is
-        no deadline at all — only a thesis to match and a next step to take. It
-        is sorted by the next action, because that is the only clock there is.</p>"""),
+        prizes, subsidised loans, programmes. <strong>Investors</strong> is
+        equity and convertibles, where there is no deadline at all — only a
+        thesis to match and a next step to take.</p>
+        <p>The distinction is real, which is why the columns change with it: a
+        call has an amount and a deadline, an investor a ticket and a next
+        action. It is a property of the rows, though, not two separate places —
+        so unfiltered you see both, sorted by whatever happens next, and rows
+        with no date at all sit at the bottom.</p>
+        <p>The split is derived, not typed: equity and convertible instruments,
+        and VC or angel providers, read as investors.</p>"""),
 
     # --- the company profile -----------------------------------------------
 
