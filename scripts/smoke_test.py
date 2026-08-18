@@ -813,6 +813,47 @@ with TestClient(app) as c:
           "getElementById('help-modal')" in h.text
           and "getElementById('modal')" not in h.text)
 
+    print("\n== nothing runs unbounded ==")
+    from app.db import close_interrupted_scans
+    from app.discovery.scanner import (MAX_RETRIES, REQUEST_TIMEOUT, SOURCE_DEADLINE,
+                                       client as api_client)
+    from app.discovery.verifier import verify_opportunity as _v  # same client
+    # Every agentic loop streams. A non-streaming request cannot outlive ten
+    # minutes, and a turn that spends its time in server-side web search does:
+    # measured on one source, thirty minutes and two seconds before the SDK gave
+    # up. The SDK's own guard estimates duration from max_tokens and misses it.
+    import inspect
+    from app.discovery import evaluator as _ev, scanner as _sc, verifier as _vf
+    for name, fn in [("scanner", _sc.scan_source),
+                     ("verifier", _vf.verify_opportunity),
+                     ("evaluator", _ev.evaluate_opportunity)]:
+        src = inspect.getsource(fn)
+        check(f"the {name} loop streams its turns",
+              "turn(" in src and "messages.create(" not in src)
+    check("and the streaming helper is the only place that calls the API",
+          "messages.stream(" in inspect.getsource(_sc.turn))
+
+    api = api_client()
+    check("the API client has an explicit timeout", api.timeout == REQUEST_TIMEOUT)
+    check("and does not retry its way past it", api.max_retries == MAX_RETRIES)
+    check("a single source has a wall-clock deadline",
+          0 < SOURCE_DEADLINE <= 1800, str(SOURCE_DEADLINE))
+    check("the worst case for one source is bounded, and under an hour",
+          SOURCE_DEADLINE + REQUEST_TIMEOUT * (MAX_RETRIES + 1) < 3600)
+
+    # A row still open after a restart cannot be true: whatever it described
+    # died with the process that wrote it.
+    with get_db() as db:
+        db.execute("INSERT INTO scan_log (source_id, started_at) VALUES (1, '2026-08-18 15:33:24')")
+    check("a scan left open by a dead process is closed at startup",
+          close_interrupted_scans() >= 1)
+    with get_db() as db:
+        row = db.execute("SELECT outcome, finished_at FROM scan_log "
+                         "ORDER BY id DESC LIMIT 1").fetchone()
+    check("and is marked interrupted rather than quietly succeeded",
+          row["outcome"] == "interrupted" and row["finished_at"])
+    check("running it again finds nothing to close", close_interrupted_scans() == 0)
+
     print("\n== what is running ==")
     from app import jobs
     jobs.clear()

@@ -11,7 +11,7 @@ import anthropic
 
 from ..db import OPPORTUNITY_FIELDS, get_db
 from .profile_context import opportunity_block
-from .scanner import FIELD_SHAPE, model
+from .scanner import FIELD_SHAPE, client, model, turn
 
 MAX_TURNS = 6
 
@@ -115,14 +115,14 @@ def verify_opportunity(opportunity_id: int) -> dict:
         return {"outcome": "error", "detail": f"opportunity {opportunity_id} not found"}
     opportunity = dict(row)
 
-    client = anthropic.Anthropic()
+    api = client()
     messages = [{"role": "user", "content":
                  "# STORED RECORD\n" + opportunity_block(opportunity)}]
     result = None
     try:
         for _ in range(MAX_TURNS):
-            response = client.messages.create(
-                model=model(), max_tokens=12000, output_config={"effort": "high"},
+            response = turn(
+                api, model=model(), max_tokens=12000, output_config={"effort": "high"},
                 system=SYSTEM, tools=TOOLS, messages=messages,
             )
             if response.stop_reason == "refusal":

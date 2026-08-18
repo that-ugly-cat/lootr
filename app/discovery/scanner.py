@@ -12,6 +12,7 @@ when the profile changes.
 """
 import json
 import os
+import time
 from datetime import date
 
 import anthropic
@@ -44,6 +45,42 @@ def model() -> str:
 MAX_TURNS = 8
 MAX_WEB_SEARCHES = 14
 CADENCE_DAYS = {"weekly": 7, "monthly": 30, "quarterly": 90}
+
+# Nothing may run unbounded. Observed scans finish in five to six minutes; the
+# ceilings below are generous against that and still finite, which the defaults
+# were not: the SDK waits ten minutes per request and retries twice, so one
+# stuck call could hold a source for half an hour — with the rest of the night's
+# sources queued behind it. Measured on CDP Venture Capital, 18 August: thirty
+# minutes and two seconds, then "Request timed out or interrupted".
+#
+# The timeout can afford to be generous because these calls stream (see below).
+# It would not be safe otherwise: a non-streaming request that runs long dies of
+# the ten-minute ceiling regardless of what we ask for.
+REQUEST_TIMEOUT = 600.0   # one model call, including its server-side searches
+MAX_RETRIES = 1           # a retry of a ten-minute call is expensive to be wrong about
+SOURCE_DEADLINE = 900.0   # wall clock for one source, checked between turns
+
+
+def client() -> anthropic.Anthropic:
+    """The API client, with limits. Shared by scanner, verifier and evaluator so
+    none of them can be the one that hangs."""
+    return anthropic.Anthropic(timeout=REQUEST_TIMEOUT, max_retries=MAX_RETRIES)
+
+
+def turn(api: anthropic.Anthropic, **kwargs):
+    """One model call, streamed, returning the finished Message.
+
+    Streamed not because anything here wants the events — the loops want the
+    whole message — but because a non-streaming request cannot outlive ten
+    minutes, and a turn that spends its time in server-side web search easily
+    does. The SDK's own guard does not catch it: it estimates duration from
+    `max_tokens`, and search time is not generation time, so the estimate passes
+    and the wall clock does not. Streaming also keeps the connection busy, which
+    is what stops a network from dropping it as idle.
+    """
+    with api.messages.stream(**kwargs) as stream:
+        return stream.get_final_message()
+
 
 # Every field is a plain string, with "" meaning not known / not changed.
 # Nullable would be the natural shape, but a strict schema allows at most 16
@@ -242,13 +279,21 @@ def _store_proposals(source: dict, proposals: list[dict]) -> int:
 
 def scan_source(source: dict) -> dict:
     """One agentic loop over a single source."""
-    client = anthropic.Anthropic()
+    api = client()
     messages = [{"role": "user", "content": _user_prompt(source)}]
     tools = [WEB_SEARCH_TOOL, SUBMIT_TOOL]
     proposals = None
+    deadline = time.monotonic() + SOURCE_DEADLINE
 
     for _ in range(MAX_TURNS):
-        response = client.messages.create(
+        # Checked between turns rather than mid-call: a request already in
+        # flight is bounded by its own timeout, and stopping here means the
+        # source gives up instead of holding the runner for the whole night.
+        if time.monotonic() > deadline:
+            return {"source": source["name"], "outcome": "error",
+                    "detail": f"gave up after {SOURCE_DEADLINE:.0f}s"}
+        response = turn(
+            api,
             model=model(),
             max_tokens=16000,
             output_config={"effort": "high"},

@@ -17,7 +17,7 @@ import anthropic
 
 from ..db import COMMITMENT_KINDS, CONDITION_TIMING, get_db
 from .profile_context import opportunity_block, products_block, profile_block
-from .scanner import model
+from .scanner import client, model, turn
 
 MAX_TURNS = 6
 # The evaluator may read the call's own page to settle an eligibility question
@@ -291,13 +291,13 @@ def evaluate_opportunity(opportunity_id: int) -> dict:
         _submit_tool(counter_keys, product_ids),
     ]
 
-    client = anthropic.Anthropic()
+    api = client()
     messages = [{"role": "user", "content": prompt}]
     result = None
     try:
         for _ in range(MAX_TURNS):
-            response = client.messages.create(
-                model=model(), max_tokens=12000, output_config={"effort": "high"},
+            response = turn(
+                api, model=model(), max_tokens=12000, output_config={"effort": "high"},
                 system=SYSTEM, tools=tools, messages=messages,
             )
             if response.stop_reason == "refusal":

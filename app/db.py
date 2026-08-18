@@ -580,6 +580,24 @@ def init_db() -> None:
 # ------------------------------------------------------------------ helpers
 
 
+def close_interrupted_scans() -> int:
+    """Mark scan_log rows left open by a process that is no longer running.
+
+    Called at startup only. A row with no `finished_at` means "in progress",
+    and after a restart that cannot be true: whatever was running died with the
+    process. Left alone, those rows sit in the scan log claiming to be running
+    forever — the exact way a record on disk lies about work in flight, which is
+    why the toast keeps its state in memory instead.
+    """
+    with get_db() as db:
+        cur = db.execute(
+            "UPDATE scan_log SET finished_at=CURRENT_TIMESTAMP, outcome='interrupted', "
+            "detail=COALESCE(detail, '{\"outcome\": \"interrupted\", \"detail\": "
+            "\"the process restarted while this scan was running\"}') "
+            "WHERE finished_at IS NULL")
+        return cur.rowcount
+
+
 def get_config(key: str, default: str = "") -> str:
     with get_db() as db:
         row = db.execute("SELECT value FROM config WHERE key=?", (key,)).fetchone()

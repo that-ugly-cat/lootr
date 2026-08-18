@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import jobs
 from .auth import bootstrap_admin, check_api_key
-from .db import company_profile, init_db
+from .db import close_interrupted_scans, company_profile, init_db
 from .discovery.evaluator import run_evaluations
 from .discovery.link_monitor import run_link_monitor
 from .discovery.scanner import run_scan
@@ -54,6 +54,9 @@ def _scheduled_scan():
 async def lifespan(app: FastAPI):
     init_db()
     bootstrap_admin()
+    orphaned = close_interrupted_scans()
+    if orphaned:
+        print(f"[startup] {orphaned} scan log row(s) left open by the previous process")
     if os.environ.get("LOOTR_SCHEDULER", "1") == "1":
         scheduler.add_job(_tracked("links", "Checking links", run_link_monitor),
                           CronTrigger(hour=3, minute=0), id="link_monitor")
