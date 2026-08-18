@@ -295,6 +295,238 @@ HELP: dict[str, tuple[str, str]] = {
         consumes de minimis, or it is open only to companies that have raised
         less than a stated amount. One call can carry several at once.</p>"""),
 
+    # --- the opportunity form, field by field ---------------------------------
+    # Written for the person filling a row in by hand after the scanner got
+    # something wrong. Each one carries the thing that is obvious only after a
+    # few applications, not a restatement of the label.
+
+    "title": ("Title", """
+        <p>The scheme's own name, as the call writes it — <em>Smart&amp;Start
+        Italia</em>, not <em>Invitalia loan</em>.</p>
+        <p>It is what the scanner matches against when it decides whether
+        something it found is already tracked, so a name of your own invention
+        produces a duplicate the next time the source is scanned.</p>"""),
+
+    "provider": ("Provider", """
+        <p>Who actually grants the money, not who publicises it. A regional
+        call announced by a chamber of commerce but decided by the region is
+        the region's.</p>
+        <p>The box suggests providers already recorded: pick one rather than
+        retyping, or the two spellings become two providers when you filter.</p>"""),
+
+    "link": ("Link", """
+        <p>The call's own page — not a news article about it, not the
+        provider's home page.</p>
+        <p>This is the page the nightly link monitor fetches and hashes: a link
+        to a press release means it watches the press release, and the day the
+        call's terms change nothing is flagged.</p>"""),
+
+    "description": ("Description", """
+        <p>What the money is for, in a couple of sentences, in your own words.
+        Prose belongs here — the structured fields around it are read by
+        code.</p>"""),
+
+    "amount_min": ("Amount range", """
+        <p>What a single beneficiary can receive, not the call's total budget —
+        that has its own field.</p>
+        <p>Leave blank rather than guessing: an invented range distorts the fit
+        score, which weighs the amount against the work of applying.</p>"""),
+
+    "amount_max": ("Amount range", """
+        <p>The ceiling per beneficiary. Read it against the funding rate: a
+        scheme paying 50% of costs up to 200k means a 400k project, and the
+        other 200k is yours to find.</p>"""),
+
+    "currency": ("Currency", """
+        <p>Three-letter code for the amounts on this row. Nothing converts
+        automatically; a row in one currency compared against a counter in
+        another is your own arithmetic to do.</p>"""),
+
+    "funding_rate_pct": ("Funding rate", """
+        <p>The share of eligible costs the scheme pays. 80% means you fund the
+        other 20% yourself, which is what the co-financing field records.</p>
+        <p>Watch for rates that vary by region or by company profile — the
+        headline rate is often the best case. Put the conditions in other
+        requirements, verbatim.</p>"""),
+
+    "cofinancing_pct": ("Co-financing", """
+        <p>What you must put in, as a share of the project. Cash you have to
+        find before the money arrives, so it decides whether an award is
+        actually usable.</p>
+        <p>Some schemes accept own labour or in-kind contributions here and
+        some demand cash: that distinction lives in other requirements.</p>"""),
+
+    "advance_available": ("Advance available", """
+        <p>Whether any of the money arrives before you spend it.</p>
+        <p>On a short runway this decides more than the amount does: a smaller
+        award paid up front is usable, a larger one paid on reimbursement after
+        the spend may not be. The conditions attached to an advance — a bank
+        guarantee, a milestone, a signed contract — go in other requirements,
+        not in this flag.</p>"""),
+
+    "call_total_budget": ("Total call budget", """
+        <p>How much the call is handing out overall. Free text, because sources
+        write it in wildly different ways.</p>
+        <p>Read together with the deadline type: a large per-company amount out
+        of a small total budget on a first-come basis is a race, not a
+        deadline.</p>"""),
+
+    "deadline_date": ("Next deadline", """
+        <p>The next date that actually closes a submission window. For a
+        rolling scheme leave it empty — a made-up date sorts the table
+        wrongly and produces false urgency.</p>"""),
+
+    "deadline_text": ("Deadline as written", """
+        <p>The call's own wording, however long. Sportello formulations often
+        run to a paragraph, and the paragraph is where the conditions live.</p>
+        <p>The table shows a short label and keeps this text in the tooltip and
+        the modal: verbatim is preserved, but it is not column material.</p>"""),
+
+    "cutoff_dates": ("Cut-off dates", """
+        <p>A JSON array of dates, for schemes that stay open but evaluate in
+        batches: <code>["2026-03-31","2026-09-30"]</code>.</p>
+        <p>Missing a cut-off usually costs months rather than the
+        opportunity — which is exactly why it is worth recording.</p>"""),
+
+    "recurrence_logic": ("Recurrence", """
+        <p>Whether this comes back, and on what rhythm. A call that reopens
+        every year is worth preparing for even after the current window
+        closes.</p>"""),
+
+    "opens_at": ("Opens at", """
+        <p>When submissions start. A window that opens in two months and closes
+        two weeks later is a preparation deadline today.</p>"""),
+
+    "decision_lag_months": ("Decision lag", """
+        <p>How long from submission to an answer. This, plus the disbursement
+        shape, is when the money could realistically arrive — usually much
+        later than the deadline suggests.</p>"""),
+
+    "project_duration_months": ("Project duration", """
+        <p>How long the funded project must run. A short runway plus a long
+        mandatory duration is a commitment, not just a timeline.</p>"""),
+
+    "eligible_geographies": ("Eligible geographies", """
+        <p>Where the money can be spent or the beneficiary must be, as a JSON
+        array with the coding system named:
+        <code>[{"code":"ITF","system":"NUTS"}]</code>.</p>
+        <p>The system matters: <em>ITF</em> is a NUTS macro-region, not a
+        country code, and comparing the two silently produces nonsense.</p>"""),
+
+    "requires_unit_in": ("Requires a unit in", """
+        <p>The region or country where the scheme wants an operating unit.
+        Whether it must already exist is the next field, and that is the
+        distinction that decides eligibility.</p>"""),
+
+    "unit_deadline_months": ("Months to open it", """
+        <p>How long after the award you would have to open the required unit.
+        Only meaningful when the requirement is a commitment rather than a
+        gate — see the field above.</p>"""),
+
+    "max_company_age_years": ("Max company age", """
+        <p>The age ceiling for applicants. Company age is derived from the
+        incorporation date, never stored, so this comparison stays true as
+        time passes.</p>
+        <p>Check what the call counts from: incorporation, VAT registration, or
+        entry in a special register are three different dates.</p>"""),
+
+    "requires_partners": ("Partners required", """
+        <p>Whether you must apply with someone else — a research organisation,
+        another company, a consortium.</p>
+        <p>For a two-person team this usually changes the answer more than the
+        amount does: it turns a form into months of partner-finding.</p>"""),
+
+    "partner_requirements": ("Partner requirements", """
+        <p>Who those partners must be, in the call's own terms: how many, from
+        which countries, what kind of organisation, who may lead.</p>"""),
+
+    "trl_min": ("TRL range", """
+        <p>The maturity band the call funds. Compared against each product
+        line's own TRL, not the company's — a call wanting TRL 6-8 can suit one
+        line and exclude another.</p>
+        <p>A line below the range is often the more fixable case: the evidence
+        for a higher TRL may already exist and simply not be written down.</p>"""),
+
+    "trl_max": ("TRL range", """
+        <p>The top of the maturity band. Above it, the call considers the
+        technology already market-ready and will fund something else.</p>"""),
+
+    "eligible_sme_sizes": ("Eligible sizes", """
+        <p>Which company sizes may apply, in the EU definition — micro, small,
+        medium, large.</p>
+        <p>The definition counts headcount <em>and</em> turnover or balance
+        sheet, and it counts linked and partner companies too: an investor with
+        a large holding can push a small company out of the category.</p>"""),
+
+    "sector_tags": ("Sector tags", """
+        <p>What the call is about, in the shared vocabulary. Used to spot
+        thematic fit at a glance and to search the table.</p>
+        <p>Pick from the list where you can. A tag typed fresh every time
+        becomes three near-synonyms that never filter together.</p>"""),
+
+    "impact_focus": ("Impact focus", """
+        <p>The outcome the call is buying — water efficiency, soil health,
+        climate adaptation. Often the deciding factor in scoring, and the place
+        where an application is won or lost on framing rather than merit.</p>"""),
+
+    "other_requirements": ("Other requirements", """
+        <p>Everything the structured fields cannot hold, <strong>in the source's
+        own words</strong>: cumulative ceilings, conditions attached to an
+        advance, obligations that fall due after the award, exclusions.</p>
+        <p>Do not paraphrase. The evaluator reads this text to build the caps
+        and commitments, and the exact wording is what decides whether a
+        threshold bites.</p>"""),
+
+    "ticket_min": ("Ticket size", """
+        <p>What this investor actually writes, per company. Only relevant on
+        equity and convertible rows.</p>
+        <p>A fund whose ticket starts well above what you are raising is not a
+        near miss — it is a different stage, and worth recording as such rather
+        than chasing.</p>"""),
+
+    "ticket_max": ("Ticket size", """
+        <p>The upper end of the cheque. Together with the minimum it says
+        whether you are the right size for this investor at all.</p>"""),
+
+    "stage_focus": ("Stage focus", """
+        <p>The stage this investor backs. Stage labels mean different things to
+        different funds: what one calls seed another calls pre-seed, so read it
+        with the ticket size rather than on its own.</p>"""),
+
+    "sector_focus": ("Sector focus", """
+        <p>What the fund invests in, in its own words. Useful for the honest
+        version of the question: are you in their thesis, or would you be the
+        exception they have to argue for internally?</p>"""),
+
+    "geo_focus": ("Geography focus", """
+        <p>Where the fund invests. Some are restricted by their own mandate —
+        a fund with public money behind it often cannot invest outside its
+        region, whatever it thinks of the company.</p>"""),
+
+    "lead_or_follow": ("Lead or follow", """
+        <p>Whether they can set terms and price a round, or only join one
+        someone else leads.</p>
+        <p>A round with no lead does not close. A list of enthusiastic
+        followers is not a round.</p>"""),
+
+    "source_id": ("Source", """
+        <p>Which tracked source this came from. It scopes the nightly scan: the
+        source sees its own rows in the digest, so it can tell a genuinely new
+        find from something already recorded.</p>
+        <p>A row with no source is still scanned against, but nothing goes
+        looking for updates to it on its own.</p>"""),
+
+    "priority": ("Priority", """
+        <p>Your call, not the tool's. The fit score is a machine estimate and
+        gets recomputed; this field is never touched by any automated
+        process.</p>"""),
+
+    "best_fit_product_id": ("Best-fit product", """
+        <p>Which product line this opportunity suits best. Set by the evaluator
+        when it scores the lines, and overridable here.</p>
+        <p>Left empty on company-level money — a round, a hire, a
+        certification — which is what the <em>general</em> flag marks.</p>"""),
+
     "requires_qualification": ("Required qualifications", """
         <p>Registrations and certifications a call takes as a precondition:
         innovative-startup status, a B-Corp certificate, an ISO standard, an EIC

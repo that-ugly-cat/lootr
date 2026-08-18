@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% from "_fields.html" import tags %}
+{# Every macro appends its own `?`. One place decides, so a field cannot be
+   added without its explanation, and a call site cannot forget it. A key the
+   help file does not know renders nothing rather than breaking. #}
 {% macro txt(name, label, value, type='text', span=false) %}
-  <label class="{% if span %}span2{% endif %}">{{ label|safe }}
+  <label class="{% if span %}span2{% endif %}">{{ label|safe }} {{ help(name) }}
     <input type="{{ type }}" {% if type == 'number' %}step="any"{% endif %}
            name="{{ name }}" value="{{ value if value is not none else '' }}"></label>
 {% endmacro %}
@@ -9,20 +12,20 @@
    strings: comparing the two directly leaves the select on the dash and the
    stored value looks lost. #}
 {% macro sel(name, label, value, options) %}
-  <label>{{ label|safe }}
+  <label>{{ label|safe }} {{ help(name) }}
     <select name="{{ name }}">
       <option value="">—</option>
       {% for o in options %}<option value="{{ o }}" {% if value is not none and value|string == o %}selected{% endif %}>{{ o.replace('_', ' ') }}</option>{% endfor %}
     </select></label>
 {% endmacro %}
 {% macro dl(name, label, value, options) %}
-  <label>{{ label|safe }}
+  <label>{{ label|safe }} {{ help(name) }}
     <input name="{{ name }}" value="{{ value if value is not none else '' }}"
            list="dl-o-{{ name }}" autocomplete="off">
     <datalist id="dl-o-{{ name }}">{% for o in options %}<option value="{{ o }}">{% endfor %}</datalist></label>
 {% endmacro %}
 {% macro yesno(name, label, value) %}
-  <label>{{ label|safe }}
+  <label>{{ label|safe }} {{ help(name) }}
     <select name="{{ name }}">
       <option value="" {% if value is none %}selected{% endif %}>unknown</option>
       <option value="1" {% if value == 1 %}selected{% endif %}>yes</option>
@@ -40,20 +43,13 @@
   <div class="grid2">
     {{ txt('title', 'Title *', o.title, span=true) }}
     {{ dl('provider', 'Provider', o.provider, opts['provider']) }}
-    <label>Provider type {{ help('provider_type') }}
-      <select name="provider_type">
-        <option value="">—</option>
-        {% for p in provider_types %}<option value="{{ p }}" {% if o.provider_type == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
-      </select></label>
-    <label>Instrument {{ help('instrument') }}
-      <select name="instrument">
-        <option value="">—</option>
-        {% for i in instruments %}<option value="{{ i }}" {% if o.instrument == i %}selected{% endif %}>{{ i }}</option>{% endfor %}
-      </select></label>
-    {{ yesno('dilutive', 'Dilutive ' ~ help('dilutive'), o.dilutive) }}
-    {{ yesno('is_general', 'General ' ~ help('is_general'), o.is_general) }}
-    {{ txt('link', 'Link', o.link, span=true) }}
-    <label class="span2">Description <textarea name="description" rows="3">{{ o.description or '' }}</textarea></label>
+    {{ sel('provider_type', 'Provider type', o.provider_type, provider_types) }}
+    {{ sel('instrument', 'Instrument', o.instrument, instruments) }}
+    {{ yesno('dilutive', 'Dilutive', o.dilutive) }}
+    {{ yesno('is_general', 'General', o.is_general) }}
+    {{ txt('link', 'Link', o.link, type='url', span=true) }}
+    <label class="span2">Description {{ help('description') }}
+      <textarea name="description" rows="3">{{ o.description or '' }}</textarea></label>
   </div>
 </div>
 
@@ -66,9 +62,9 @@
     {{ txt('funding_rate_pct', 'Funding rate %', o.funding_rate_pct, type='number') }}
     {{ txt('cofinancing_pct', 'Co-financing %', o.cofinancing_pct, type='number') }}
     {{ yesno('advance_available', 'Advance available', o.advance_available) }}
-    {{ sel('disbursement', 'Disbursement ' ~ help('disbursement'), o.disbursement,
+    {{ sel('disbursement', 'Disbursement', o.disbursement,
             ['advance', 'milestones', 'reimbursement_on_report']) }}
-    {{ sel('aid_regime', 'Aid regime ' ~ help('aid_regime'), o.aid_regime,
+    {{ sel('aid_regime', 'Aid regime', o.aid_regime,
             ['de_minimis', 'block_exempted', 'notified', 'none']) }}
     {{ txt('call_total_budget', 'Total call budget', o.call_total_budget, span=true) }}
   </div>
@@ -77,12 +73,8 @@
 <div class="card">
   <h3>Time</h3>
   <div class="grid2">
-    <label>Deadline type {{ help('deadline_type') }}
-      <select name="deadline_type">
-        {% for d in ['', 'fixed', 'cutoffs', 'rolling', 'open_until_funds_exhausted', 'unknown'] %}
-          <option value="{{ d }}" {% if o.deadline_type == d %}selected{% endif %}>{{ d or '—' }}</option>
-        {% endfor %}
-      </select></label>
+    {{ sel('deadline_type', 'Deadline type', o.deadline_type,
+            ['fixed', 'cutoffs', 'rolling', 'open_until_funds_exhausted', 'unknown']) }}
     {{ txt('deadline_date', 'Next deadline', o.deadline_date, type='date') }}
     {{ txt('deadline_text', 'Deadline as written', o.deadline_text) }}
     {{ txt('cutoff_dates', 'Cut-off dates (JSON)', o.cutoff_dates) }}
@@ -98,7 +90,7 @@
   <div class="grid2">
     {{ txt('eligible_geographies', 'Eligible geographies (JSON)', o.eligible_geographies, span=true) }}
     {{ dl('requires_unit_in', 'Requires a unit in', o.requires_unit_in, opts['requires_unit_in']) }}
-    {{ sel('unit_required_by', 'Unit required by ' ~ help('unit_required_by'), o.unit_required_by, condition_timing) }}
+    {{ sel('unit_required_by', 'Unit required by', o.unit_required_by, condition_timing) }}
     {{ txt('unit_deadline_months', 'Months to open it', o.unit_deadline_months, type='number') }}
     {{ txt('max_company_age_years', 'Max company age (years)', o.max_company_age_years, type='number') }}
     {{ yesno('requires_partners', 'Partners required', o.requires_partners) }}
@@ -107,11 +99,11 @@
     {{ sel('trl_max', 'TRL max', o.trl_max, trl_levels) }}
     {{ tags('eligible_sme_sizes', 'Eligible sizes', o.eligible_sme_sizes,
             tag_options['eligible_sme_sizes'], allow_new=false) }}
-    {{ tags('requires_qualification', 'Requires qualification ' ~ help('requires_qualification'),
+    {{ tags('requires_qualification', 'Requires qualification',
             o.requires_qualification, tag_options['requires_qualification'], allow_new=false) }}
     {{ tags('sector_tags', 'Sector tags', o.sector_tags, tag_options['sector_tags']) }}
     {{ tags('impact_focus', 'Impact focus', o.impact_focus, tag_options['impact_focus']) }}
-    <label class="span2">Other requirements
+    <label class="span2">Other requirements {{ help('other_requirements') }}
       <textarea name="other_requirements" rows="3">{{ o.other_requirements or '' }}</textarea></label>
   </div>
 </div>
@@ -134,22 +126,17 @@
 <div class="card">
   <h3>Tracking {{ help('effort') }}</h3>
   <div class="grid2">
-    <label>Status
-      <select name="status">
-        {% for s in states %}<option value="{{ s }}" {% if (o.status or 'watching') == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-      </select></label>
-    <label>Source
+    {{ sel('status', 'Status', o.status or 'watching', states) }}
+    {# Two selects whose options are rows, not words: they carry an id and show
+       a name, so they stay hand-written — with the same `?` as the rest. #}
+    <label>Source {{ help('source_id') }}
       <select name="source_id">
         <option value="">—</option>
         {% for s in sources %}<option value="{{ s.id }}" {% if o.source_id == s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
       </select></label>
-    <label>Effort
-      <select name="effort">
-        {% for e in ['', 'low', 'medium', 'high', 'needs_consultant'] %}
-          <option value="{{ e }}" {% if o.effort == e %}selected{% endif %}>{{ e or '—' }}</option>{% endfor %}
-      </select></label>
+    {{ sel('effort', 'Effort', o.effort, ['low', 'medium', 'high', 'needs_consultant']) }}
     {{ dl('priority', 'Priority', o.priority, ['high', 'medium', 'low']) }}
-    <label>Best-fit product
+    <label>Best-fit product {{ help('best_fit_product_id') }}
       <select name="best_fit_product_id">
         <option value="">—</option>
         {% for p in products %}<option value="{{ p.id }}" {% if o.best_fit_product_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}

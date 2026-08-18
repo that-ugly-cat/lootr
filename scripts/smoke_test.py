@@ -5,6 +5,7 @@
 Uses a throwaway database in a temp directory; touches nothing in ./data.
 """
 import json
+import re
 import os
 import sys
 import tempfile
@@ -738,6 +739,23 @@ with TestClient(app) as c:
     check("the display name overrides the legal name",
           "BeadRoots (dev)" in c.get("/calls").text)
     c.post("/admin/config/company_display_name", data={"value": ""})
+
+    # Every field on the opportunity form explains itself. Asserted rather than
+    # eyeballed, because the failure mode is a field added later with no `?` and
+    # nobody noticing until someone needs it.
+    r = c.get("/opportunities/new")
+    # Form controls only — `name=` also appears on <meta>, which is not a field.
+    named = set(re.findall(r'<(?:input|select|textarea)[^>]*name="([a-z_0-9]+)"', r.text))
+    named -= {"view"}                                       # the hidden return-view marker
+    named = {n for n in named if not n.endswith("__new")}   # the add box of a tag field
+    missing = sorted(n for n in named if f'hx-get="/help/{n}"' not in r.text)
+    check("every field on the opportunity form carries its own help",
+          not missing, "missing: " + ", ".join(missing))
+    check("the row pickers are covered too, not just the macro-rendered fields",
+          'hx-get="/help/source_id"' in r.text
+          and 'hx-get="/help/best_fit_product_id"' in r.text)
+    check("the link field is a url input",
+          re.search(r'<input type="url"[^>]*name="link"', r.text) is not None)
 
     print("\n== multi-value fields ==")
     r = c.get("/opportunities/new")

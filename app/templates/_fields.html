@@ -10,7 +10,7 @@
    next save. #}
 {% macro tags(name, label, value, options, allow_new=true) %}
 {% set chosen = value|fromjson %}
-<label class="span2">{{ label|safe }}
+<label class="span2">{{ label|safe }} {{ help(name) }}
   {%- if options %}
   <select name="{{ name }}" multiple size="{{ [options|length, 6]|min }}">
     {% for opt in options %}
