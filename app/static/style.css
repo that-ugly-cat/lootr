@@ -224,6 +224,47 @@ code.key {
    tab styles it replaces are gone: two pages became one. */
 .view-filter { font-weight: 600; border-color: var(--accent-dim); }
 
+/* the guide: prose, with its contents alongside */
+.guide-layout { display: grid; grid-template-columns: 14rem 1fr; gap: 2.5rem; align-items: start; }
+.guide-toc {
+  position: sticky; top: 1.5rem; font-size: 0.78rem; line-height: 1.5;
+  border-right: 1px solid var(--border); padding-right: 1rem;
+}
+.guide-toc-title {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--faint); font-weight: 700; margin-bottom: 0.5rem;
+}
+.guide-toc ul { list-style: none; margin: 0; padding: 0; }
+.guide-toc ul ul { padding-left: 0.7rem; }
+.guide-toc li { margin: 0.25rem 0; }
+.guide-toc a { color: var(--label); text-decoration: none; }
+.guide-toc a:hover { color: var(--accent); }
+
+.guide { max-width: 46rem; font-size: 0.92rem; line-height: 1.65; }
+.guide h1 { font-size: 1.5rem; margin-bottom: 0.8rem; }
+.guide h2 {
+  font-size: 1.1rem; margin: 2.2rem 0 0.7rem; padding-top: 0.6rem;
+  border-top: 1px solid var(--border); color: var(--fg);
+}
+.guide h3 { font-size: 0.95rem; margin: 1.4rem 0 0.4rem; color: var(--accent); }
+.guide p, .guide ul, .guide ol { margin: 0.7rem 0; color: var(--label); }
+.guide li { margin: 0.35rem 0; }
+.guide strong { color: var(--fg); }
+.guide code {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  padding: 0 0.3em; font-size: 0.88em; color: var(--accent);
+}
+.guide table { font-size: 0.82rem; }
+.guide hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+/* The anchors the table of contents points at, landing clear of the header. */
+.guide h2[id], .guide h3[id] { scroll-margin-top: 1.5rem; }
+
+@media (max-width: 860px) {
+  .guide-layout { grid-template-columns: 1fr; }
+  .guide-toc { position: static; border-right: none; padding-right: 0;
+               border-bottom: 1px solid var(--border); padding-bottom: 0.8rem; }
+}
+
 /* fit score */
 .fit { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
 .fit-bar { width: 44px; height: 5px; background: #23273a; border-radius: 3px; overflow: hidden; }

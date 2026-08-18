@@ -781,6 +781,23 @@ with TestClient(app) as c:
           "getElementById('help-modal')" in h.text
           and "getElementById('modal')" not in h.text)
 
+    print("\n== the guide ==")
+    check("the guide is gated like everything else",
+          TestClient(app).get("/guide").status_code == 401)
+    r = c.get("/guide")
+    check("the guide renders from its markdown source",
+          r.status_code == 200 and "<h1" in r.text and "User guide" in r.text)
+    check("every section of the guide is there",
+          all(s in r.text for s in ["Fundamentals", "profile and products",
+                                    "Opportunities", "Sources",
+                                    "discovery engine", "Pipeline",
+                                    "MCP integration", "Admin"]))
+    check("the guide has a table of contents pointing at real anchors",
+          'class="toc"' in r.text and 'href="#fundamentals"' in r.text
+          and 'id="fundamentals"' in r.text)
+    check("markdown tables render as tables", "<table>" in r.text)
+    check("the guide is one click from anywhere", 'href="/guide"' in c.get("/opportunities").text)
+
     print("\n== multi-value fields ==")
     r = c.get("/opportunities/new")
     # A datalist cannot serve a list: it completes the whole box. These are

@@ -1,6 +1,7 @@
 """HTMX/Jinja2 web UI: two opportunity views, company profile, pipeline,
 proposals queue, sources, admin, auth."""
 import json
+import markdown
 import os
 import threading
 from datetime import date
@@ -380,6 +381,38 @@ def _tag_options(record: dict) -> dict:
         _distinct("key", "company_qualifications")
         + json_field(record.get("requires_qualification"))))
     return options
+
+
+# --- the guide --------------------------------------------------------------
+
+GUIDE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "guide.md")
+_guide_cache: dict = {}
+
+
+def _guide() -> tuple[str, str]:
+    """The guide, rendered from its markdown source, with a table of contents.
+
+    Markdown is the source of truth because it reviews well in a diff — the
+    guide changes with the tool, and a paragraph that quietly stopped being true
+    should be visible in a commit. Cached on the file's modification time, so an
+    edit shows up without a restart but the parse does not run per request.
+    """
+    stamp = os.path.getmtime(GUIDE_PATH)
+    if _guide_cache.get("stamp") != stamp:
+        with open(GUIDE_PATH, encoding="utf-8") as fh:
+            text = fh.read()
+        # toc_depth skips the h1: the page already carries the title, and a
+        # table of contents whose first entry is the document itself is noise.
+        md = markdown.Markdown(extensions=["tables", "toc", "attr_list"],
+                               extension_configs={"toc": {"toc_depth": "2-3"}})
+        _guide_cache.update(stamp=stamp, html=md.convert(text), toc=md.toc)
+    return _guide_cache["html"], _guide_cache["toc"]
+
+
+@router.get("/guide", response_class=HTMLResponse)
+def guide_page(request: Request, user=Depends(require_user)):
+    html, toc = _guide()
+    return _render(request, "guide.html", guide=Markup(html), toc=Markup(toc))
 
 
 # --- landing & auth ---------------------------------------------------------

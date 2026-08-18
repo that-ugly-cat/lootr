@@ -28,6 +28,7 @@
       <a href="/profile">profile</a>
       <a href="/products">products</a>
       {% if user.role == 'admin' %}<a href="/admin">admin</a>{% endif %}
+      <a href="/guide">guide</a>
       <a href="/logout">logout ({{ user.username }})</a>
     {% else %}
       <a href="/login">login</a>

@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY scripts ./scripts
+COPY docs ./docs
 
 # docker compose build --build-arg GIT_COMMIT=$(git rev-parse --short=12 HEAD)
 ARG GIT_COMMIT=unknown

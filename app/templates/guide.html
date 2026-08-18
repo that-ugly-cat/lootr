@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+{# Two columns: the contents stay in view while you read, because the guide is
+   consulted far more often than it is read end to end. #}
+<div class="guide-layout">
+  <nav class="guide-toc">
+    <div class="guide-toc-title">Contents</div>
+    {{ toc }}
+  </nav>
+  <article class="guide">{{ guide }}</article>
+</div>
+{% endblock %}
