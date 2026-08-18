@@ -719,9 +719,16 @@ def _job_summary(result) -> str:
     if isinstance(result, list):
         stored = sum(r.get("stored", 0) for r in result if isinstance(r, dict))
         errors = sum(1 for r in result if isinstance(r, dict) and r.get("outcome") == "error")
+        # A degraded run is not a failure and not a success: the searches were
+        # cut off. Counting it as done would hide exactly what the flag exists
+        # to show.
+        degraded = sum(1 for r in result
+                       if isinstance(r, dict) and r.get("outcome") == "degraded")
         parts = [f"{len(result)} done"]
         if stored:
             parts.append(f"{stored} proposal{'' if stored == 1 else 's'} in the queue")
+        if degraded:
+            parts.append(f"{degraded} ran half blind — see the scan log")
         if errors:
             parts.append(f"{errors} failed")
         return " · ".join(parts)

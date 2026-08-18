@@ -246,6 +246,13 @@ code.key {
 @keyframes toast-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .toast-spin { animation: none; } }
 
+/* A scan's account of itself: one line in the table, the whole thing one click
+   away. Native <details>, so it costs no script. */
+.notes summary { cursor: pointer; color: var(--muted); }
+.notes summary:hover { color: var(--fg); }
+.notes[open] summary { color: var(--fg); margin-bottom: 0.3rem; }
+.notes-full { color: var(--muted); white-space: pre-line; max-width: 52rem; }
+
 /* the guide: prose, with its contents alongside */
 .guide-layout { display: grid; grid-template-columns: 14rem 1fr; gap: 2.5rem; align-items: start; }
 .guide-toc {

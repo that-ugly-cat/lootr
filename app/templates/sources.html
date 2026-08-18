@@ -99,7 +99,14 @@
         {%- if d.proposed is not none %}
           {{ d.stored }} proposal{{ '' if d.stored == 1 else 's' }} filed
           {%- if d.proposed != d.stored %} ({{ d.proposed }} submitted, the rest already pending){% endif %}
-          {% if d.notes %}<br><span class="muted">{{ d.notes }}</span>{% endif %}
+          {# Same rule as the deadline cell: the verbatim is kept, but it is not
+             column material. A scan's account of itself runs to a page. #}
+          {% if d.notes %}
+            <details class="notes">
+              <summary>{{ d.notes|truncate(110) }}</summary>
+              <div class="notes-full">{{ d.notes }}</div>
+            </details>
+          {% endif %}
         {%- elif d.detail %}{{ d.detail }}
         {%- else %}{{ l.detail or '' }}{% endif %}
       </td>

@@ -843,6 +843,26 @@ with TestClient(app) as c:
           and not counts_as_done("error") and not counts_as_done("interrupted"))
     check("sources are spaced out within a run", SOURCE_PAUSE >= 30)
 
+    # The notes are the whole point of the exercise: they have to be readable
+    # somewhere, and a page of prose is not a table cell.
+    with get_db() as db:
+        db.execute("INSERT INTO scan_log (source_id, started_at, finished_at, outcome, detail) "
+                   "VALUES (1, '2026-08-18 16:27:30', '2026-08-18 16:38:56', 'degraded', ?)",
+                   (json.dumps({"outcome": "degraded", "proposed": 0, "stored": 0,
+                                "notes": "Ran eight queries, then the search tool refused. "
+                                         + "Everything surfaced was closed or out of scope. " * 12}),))
+    r = c.get("/sources")
+    check("the scan log shows what a scan searched", "Ran eight queries" in r.text)
+    summary = re.search(r"<summary>(.*?)</summary>", r.text, re.S)
+    check("a long account is folded, not spread across the table",
+          '<details class="notes">' in r.text and summary is not None
+          and len(summary.group(1).strip()) < 200, summary.group(1)[:80] if summary else "no summary")
+    check("a degraded scan reads as neither passed nor failed",
+          'class="chip v-uncertain">degraded' in r.text)
+    from app.routers.ui import _job_summary
+    check("and the toast says so too rather than counting it as done",
+          "half blind" in _job_summary([{"outcome": "degraded", "stored": 0}]))
+
     print("\n== nothing runs unbounded ==")
     from app.db import close_interrupted_scans
     from app.discovery.scanner import (MAX_RETRIES, REQUEST_TIMEOUT, SOURCE_DEADLINE,
